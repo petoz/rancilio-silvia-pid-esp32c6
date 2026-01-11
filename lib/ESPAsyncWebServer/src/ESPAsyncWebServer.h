@@ -19,46 +19,46 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #ifndef _ESPAsyncWebServer_H_
-#define _ESPAsyncWebServer_H_
+  #define _ESPAsyncWebServer_H_
 
-#include "Arduino.h"
+  #include "Arduino.h"
 
-#include "FS.h"
-#include <algorithm>
-#include <deque>
-#include <functional>
-#include <list>
-#include <unordered_map>
-#include <vector>
+  #include "FS.h"
+  #include <algorithm>
+  #include <deque>
+  #include <functional>
+  #include <list>
+  #include <unordered_map>
+  #include <vector>
 
-#ifdef ESP32
-  #include <AsyncTCP.h>
-  #include <WiFi.h>
-#elif defined(ESP8266)
-  #include <ESP8266WiFi.h>
-  #include <ESPAsyncTCP.h>
-#elif defined(TARGET_RP2040)
-  #include <AsyncTCP_RP2040W.h>
-  #include <HTTP_Method.h>
-  #include <WiFi.h>
-  #include <http_parser.h>
-#else
-  #error Platform not supported
-#endif
+  #ifdef ESP32
+    #include <AsyncTCP.h>
+    #include <WiFi.h>
+  #elif defined(ESP8266)
+    #include <ESP8266WiFi.h>
+    #include <ESPAsyncTCP.h>
+  #elif defined(TARGET_RP2040)
+    #include <AsyncTCP_RP2040W.h>
+    #include <HTTP_Method.h>
+    #include <WiFi.h>
+    #include <http_parser.h>
+  #else
+    #error Platform not supported
+  #endif
 
-#include "literals.h"
+  #include "literals.h"
 
-#define ASYNCWEBSERVER_VERSION          "3.6.0"
-#define ASYNCWEBSERVER_VERSION_MAJOR    3
-#define ASYNCWEBSERVER_VERSION_MINOR    6
-#define ASYNCWEBSERVER_VERSION_REVISION 0
-#define ASYNCWEBSERVER_FORK_mathieucarbou
+  #define ASYNCWEBSERVER_VERSION          "3.6.0"
+  #define ASYNCWEBSERVER_VERSION_MAJOR    3
+  #define ASYNCWEBSERVER_VERSION_MINOR    6
+  #define ASYNCWEBSERVER_VERSION_REVISION 0
+  #define ASYNCWEBSERVER_FORK_mathieucarbou
 
-#ifdef ASYNCWEBSERVER_REGEX
-  #define ASYNCWEBSERVER_REGEX_ATTRIBUTE
-#else
-  #define ASYNCWEBSERVER_REGEX_ATTRIBUTE __attribute__((warning("ASYNCWEBSERVER_REGEX not defined")))
-#endif
+  #ifdef ASYNCWEBSERVER_REGEX
+    #define ASYNCWEBSERVER_REGEX_ATTRIBUTE
+  #else
+    #define ASYNCWEBSERVER_REGEX_ATTRIBUTE __attribute__((warning("ASYNCWEBSERVER_REGEX not defined")))
+  #endif
 
 class AsyncWebServer;
 class AsyncWebServerRequest;
@@ -72,24 +72,18 @@ class AsyncCallbackWebHandler;
 class AsyncResponseStream;
 class AsyncMiddlewareChain;
 
-#if defined(TARGET_RP2040)
-typedef enum http_method WebRequestMethod;
-#else
-  #ifndef WEBSERVER_H
 typedef enum {
-  HTTP_GET = 0b00000001,
-  HTTP_POST = 0b00000010,
-  HTTP_DELETE = 0b00000100,
-  HTTP_PUT = 0b00001000,
-  HTTP_PATCH = 0b00010000,
-  HTTP_HEAD = 0b00100000,
-  HTTP_OPTIONS = 0b01000000,
-  HTTP_ANY = 0b01111111,
+  AWS_HTTP_GET = 0b00000001,
+  AWS_HTTP_POST = 0b00000010,
+  AWS_HTTP_DELETE = 0b00000100,
+  AWS_HTTP_PUT = 0b00001000,
+  AWS_HTTP_PATCH = 0b00010000,
+  AWS_HTTP_HEAD = 0b00100000,
+  AWS_HTTP_OPTIONS = 0b01000000,
+  AWS_HTTP_ANY = 0b01111111,
 } WebRequestMethod;
-  #endif
-#endif
 
-#ifndef HAVE_FS_FILE_OPEN_MODE
+  #ifndef HAVE_FS_FILE_OPEN_MODE
 namespace fs {
   class FileOpenMode {
     public:
@@ -98,13 +92,13 @@ namespace fs {
       static const char* append;
   };
 };
-#else
-  #include "FileOpenMode.h"
-#endif
+  #else
+    #include "FileOpenMode.h"
+  #endif
 
-// if this value is returned when asked for data, packet will not be sent and you will be asked for data again
-#define RESPONSE_TRY_AGAIN          0xFFFFFFFF
-#define RESPONSE_STREAM_BUFFER_SIZE 1460
+  // if this value is returned when asked for data, packet will not be sent and you will be asked for data again
+  #define RESPONSE_TRY_AGAIN          0xFFFFFFFF
+  #define RESPONSE_STREAM_BUFFER_SIZE 1460
 
 typedef uint8_t WebRequestMethodComposite;
 typedef std::function<void(void)> ArDisconnectHandler;
@@ -269,8 +263,8 @@ class AsyncWebServerRequest {
 
     RequestedConnectionType requestedConnType() const { return _reqconntype; }
     bool isExpectedRequestedConnType(RequestedConnectionType erct1, RequestedConnectionType erct2 = RCT_NOT_USED, RequestedConnectionType erct3 = RCT_NOT_USED) const;
-    bool isWebSocketUpgrade() const { return _method == HTTP_GET && isExpectedRequestedConnType(RCT_WS); }
-    bool isSSE() const { return _method == HTTP_GET && isExpectedRequestedConnType(RCT_EVENT); }
+    bool isWebSocketUpgrade() const { return _method == AWS_HTTP_GET && isExpectedRequestedConnType(RCT_WS); }
+    bool isSSE() const { return _method == AWS_HTTP_GET && isExpectedRequestedConnType(RCT_EVENT); }
     bool isHTTP() const { return isExpectedRequestedConnType(RCT_DEFAULT, RCT_HTTP); }
     void onDisconnect(ArDisconnectHandler fn);
 
@@ -284,14 +278,14 @@ class AsyncWebServerRequest {
 
     void setHandler(AsyncWebHandler* handler) { _handler = handler; }
 
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("All headers are now collected. Use removeHeader(name) or AsyncHeaderFreeMiddleware if you really need to free some headers.")]]
-#endif
+  #endif
     void addInterestingHeader(__unused const char* name) {
     }
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("All headers are now collected. Use removeHeader(name) or AsyncHeaderFreeMiddleware if you really need to free some headers.")]]
-#endif
+  #endif
     void addInterestingHeader(__unused const String& name) {
     }
 
@@ -339,22 +333,22 @@ class AsyncWebServerRequest {
     void sendChunked(const char* contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback = nullptr) { send(beginChunkedResponse(contentType, callback, templateCallback)); }
     void sendChunked(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback = nullptr) { send(beginChunkedResponse(contentType, callback, templateCallback)); }
 
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("Replaced by send(int code, const String& contentType, const uint8_t* content, size_t len, AwsTemplateProcessor callback = nullptr)")]]
-#endif
+  #endif
     void send_P(int code, const String& contentType, const uint8_t* content, size_t len, AwsTemplateProcessor callback = nullptr) {
       send(code, contentType, content, len, callback);
     }
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("Replaced by send(int code, const String& contentType, const char* content = asyncsrv::empty, AwsTemplateProcessor callback = nullptr)")]]
     void send_P(int code, const String& contentType, PGM_P content, AwsTemplateProcessor callback = nullptr) {
       send(code, contentType, content, callback);
     }
-#else
+  #else
     void send_P(int code, const String& contentType, PGM_P content, AwsTemplateProcessor callback = nullptr) {
       send(beginResponse_P(code, contentType, content, callback));
     }
-#endif
+  #endif
 
     AsyncWebServerResponse* beginResponse(int code, const char* contentType = asyncsrv::empty, const char* content = asyncsrv::empty, AwsTemplateProcessor callback = nullptr);
     AsyncWebServerResponse* beginResponse(int code, const String& contentType, const char* content = asyncsrv::empty, AwsTemplateProcessor callback = nullptr) { return beginResponse(code, contentType.c_str(), content, callback); }
@@ -381,15 +375,15 @@ class AsyncWebServerRequest {
     AsyncResponseStream* beginResponseStream(const char* contentType, size_t bufferSize = RESPONSE_STREAM_BUFFER_SIZE);
     AsyncResponseStream* beginResponseStream(const String& contentType, size_t bufferSize = RESPONSE_STREAM_BUFFER_SIZE) { return beginResponseStream(contentType.c_str(), bufferSize); }
 
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("Replaced by beginResponse(int code, const String& contentType, const uint8_t* content, size_t len, AwsTemplateProcessor callback = nullptr)")]]
-#endif
+  #endif
     AsyncWebServerResponse* beginResponse_P(int code, const String& contentType, const uint8_t* content, size_t len, AwsTemplateProcessor callback = nullptr) {
       return beginResponse(code, contentType.c_str(), content, len, callback);
     }
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("Replaced by beginResponse(int code, const String& contentType, const char* content = asyncsrv::empty, AwsTemplateProcessor callback = nullptr)")]]
-#endif
+  #endif
     AsyncWebServerResponse* beginResponse_P(int code, const String& contentType, PGM_P content, AwsTemplateProcessor callback = nullptr);
 
     /**
@@ -403,9 +397,9 @@ class AsyncWebServerRequest {
     const AsyncWebParameter* getParam(const char* name, bool post = false, bool file = false) const;
 
     const AsyncWebParameter* getParam(const String& name, bool post = false, bool file = false) const { return getParam(name.c_str(), post, file); };
-#ifdef ESP8266
+  #ifdef ESP8266
     const AsyncWebParameter* getParam(const __FlashStringHelper* data, bool post, bool file) const;
-#endif
+  #endif
 
     /**
      * @brief Get request parameter by number
@@ -421,16 +415,16 @@ class AsyncWebServerRequest {
     const String& arg(const char* name) const;
     // get request argument value by name
     const String& arg(const String& name) const { return arg(name.c_str()); };
-#ifdef ESP8266
+  #ifdef ESP8266
     const String& arg(const __FlashStringHelper* data) const; // get request argument value by F(name)
-#endif
+  #endif
     const String& arg(size_t i) const;     // get request argument value by number
     const String& argName(size_t i) const; // get request argument name by number
     bool hasArg(const char* name) const;   // check if argument exists
     bool hasArg(const String& name) const { return hasArg(name.c_str()); };
-#ifdef ESP8266
+  #ifdef ESP8266
     bool hasArg(const __FlashStringHelper* data) const; // check if F(argument) exists
-#endif
+  #endif
 
     const String& ASYNCWEBSERVER_REGEX_ATTRIBUTE pathArg(size_t i) const;
 
@@ -438,9 +432,9 @@ class AsyncWebServerRequest {
     const String& header(const char* name) const;
     const String& header(const String& name) const { return header(name.c_str()); };
 
-#ifdef ESP8266
+  #ifdef ESP8266
     const String& header(const __FlashStringHelper* data) const; // get request header value by F(name)
-#endif
+  #endif
 
     const String& header(size_t i) const;     // get request header value by number
     const String& headerName(size_t i) const; // get request header name by number
@@ -450,15 +444,15 @@ class AsyncWebServerRequest {
     // check if header exists
     bool hasHeader(const char* name) const;
     bool hasHeader(const String& name) const { return hasHeader(name.c_str()); };
-#ifdef ESP8266
+  #ifdef ESP8266
     bool hasHeader(const __FlashStringHelper* data) const; // check if header exists
-#endif
+  #endif
 
     const AsyncWebHeader* getHeader(const char* name) const;
     const AsyncWebHeader* getHeader(const String& name) const { return getHeader(name.c_str()); };
-#ifdef ESP8266
+  #ifdef ESP8266
     const AsyncWebHeader* getHeader(const __FlashStringHelper* data) const;
-#endif
+  #endif
 
     const AsyncWebHeader* getHeader(size_t num) const;
 
@@ -475,9 +469,9 @@ class AsyncWebServerRequest {
     size_t params() const; // get arguments count
     bool hasParam(const char* name, bool post = false, bool file = false) const;
     bool hasParam(const String& name, bool post = false, bool file = false) const { return hasParam(name.c_str(), post, file); };
-#ifdef ESP8266
+  #ifdef ESP8266
     bool hasParam(const __FlashStringHelper* data, bool post = false, bool file = false) const { return hasParam(String(data).c_str(), post, file); };
-#endif
+  #endif
 
     // REQUEST ATTRIBUTES
 
@@ -789,9 +783,9 @@ class AsyncWebServerResponse {
     const AsyncWebHeader* getHeader(const char* name) const;
     const std::list<AsyncWebHeader>& getHeaders() const { return _headers; }
 
-#ifndef ESP8266
+  #ifndef ESP8266
     [[deprecated("Use instead: _assembleHead(String& buffer, uint8_t version)")]]
-#endif
+  #endif
     String _assembleHead(uint8_t version) {
       String buffer;
       _assembleHead(buffer, version);
@@ -829,10 +823,10 @@ class AsyncWebServer : public AsyncMiddlewareChain {
     void begin();
     void end();
 
-#if ASYNC_TCP_SSL_ENABLED
+  #if ASYNC_TCP_SSL_ENABLED
     void onSslFileRequest(AcSSlFileHandler cb, void* arg);
     void beginSecure(const char* cert, const char* private_key_file, const char* password);
-#endif
+  #endif
 
     AsyncWebRewrite& addRewrite(AsyncWebRewrite* rewrite);
 
@@ -878,7 +872,7 @@ class AsyncWebServer : public AsyncMiddlewareChain {
     AsyncWebHandler& addHandler(AsyncWebHandler* handler);
     bool removeHandler(AsyncWebHandler* handler);
 
-    AsyncCallbackWebHandler& on(const char* uri, ArRequestHandlerFunction onRequest) { return on(uri, HTTP_ANY, onRequest); }
+    AsyncCallbackWebHandler& on(const char* uri, ArRequestHandlerFunction onRequest) { return on(uri, AWS_HTTP_ANY, onRequest); }
     AsyncCallbackWebHandler& on(const char* uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest, ArUploadHandlerFunction onUpload = nullptr, ArBodyHandlerFunction onBody = nullptr);
 
     AsyncStaticWebHandler& serveStatic(const char* uri, fs::FS& fs, const char* path, const char* cache_control = NULL);
@@ -919,9 +913,30 @@ class DefaultHeaders {
     }
 };
 
-#include "AsyncEventSource.h"
-#include "AsyncWebSocket.h"
-#include "WebHandlerImpl.h"
-#include "WebResponseImpl.h"
+  #include "AsyncEventSource.h"
+  #include "AsyncWebSocket.h"
+  #include "WebHandlerImpl.h"
+  #include "WebResponseImpl.h"
 
 #endif /* _AsyncWebServer_H_ */
+/* Compatibility Macros for external libraries (like ElegantOTA) */
+/* Force override of http_parser macros to match Async values */
+#ifdef HTTP_GET
+  #undef HTTP_GET
+  #undef HTTP_POST
+  #undef HTTP_DELETE
+  #undef HTTP_PUT
+  #undef HTTP_PATCH
+  #undef HTTP_HEAD
+  #undef HTTP_OPTIONS
+  #undef HTTP_ANY
+#endif
+
+#define HTTP_GET     AWS_HTTP_GET
+#define HTTP_POST    AWS_HTTP_POST
+#define HTTP_DELETE  AWS_HTTP_DELETE
+#define HTTP_PUT     AWS_HTTP_PUT
+#define HTTP_PATCH   AWS_HTTP_PATCH
+#define HTTP_HEAD    AWS_HTTP_HEAD
+#define HTTP_OPTIONS AWS_HTTP_OPTIONS
+#define HTTP_ANY     AWS_HTTP_ANY

@@ -29,6 +29,7 @@ public:
 
   // Accessor
   ConfigData &data() { return _data; }
+  float getTargetTemp() const { return _data.pid_setpoint; }
 
 private:
   Preferences _prefs;

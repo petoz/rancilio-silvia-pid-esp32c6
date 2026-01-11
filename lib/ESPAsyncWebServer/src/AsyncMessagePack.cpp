@@ -41,7 +41,7 @@ AsyncCallbackMessagePackWebHandler::AsyncCallbackMessagePackWebHandler(const Str
     : _uri(uri), _method(HTTP_GET | HTTP_POST | HTTP_PUT | HTTP_PATCH), _onRequest(onRequest), maxJsonBufferSize(maxJsonBufferSize), _maxContentLength(16384) {}
   #else
 AsyncCallbackMessagePackWebHandler::AsyncCallbackMessagePackWebHandler(const String& uri, ArMessagePackRequestHandlerFunction onRequest)
-    : _uri(uri), _method(HTTP_GET | HTTP_POST | HTTP_PUT | HTTP_PATCH), _onRequest(onRequest), _maxContentLength(16384) {}
+    : _uri(uri), _method(AWS_HTTP_GET | AWS_HTTP_POST | AWS_HTTP_PUT | AWS_HTTP_PATCH), _onRequest(onRequest), _maxContentLength(16384) {}
   #endif
 
 bool AsyncCallbackMessagePackWebHandler::canHandle(AsyncWebServerRequest* request) const {
@@ -51,7 +51,7 @@ bool AsyncCallbackMessagePackWebHandler::canHandle(AsyncWebServerRequest* reques
   if (_uri.length() && (_uri != request->url() && !request->url().startsWith(_uri + "/")))
     return false;
 
-  if (request->method() != HTTP_GET && !request->contentType().equalsIgnoreCase(asyncsrv::T_application_msgpack))
+  if (request->method() != AWS_HTTP_GET && !request->contentType().equalsIgnoreCase(asyncsrv::T_application_msgpack))
     return false;
 
   return true;
@@ -59,7 +59,7 @@ bool AsyncCallbackMessagePackWebHandler::canHandle(AsyncWebServerRequest* reques
 
 void AsyncCallbackMessagePackWebHandler::handleRequest(AsyncWebServerRequest* request) {
   if (_onRequest) {
-    if (request->method() == HTTP_GET) {
+    if (request->method() == AWS_HTTP_GET) {
       JsonVariant json;
       _onRequest(request, json);
       return;

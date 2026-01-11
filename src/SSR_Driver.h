@@ -5,9 +5,18 @@
 
 class SSR_Driver {
 public:
+  SSR_Driver(uint8_t pin);
   void begin();
-  void setPower(float dutyCycle); // 0.0 - 100.0 or 0.0 - 1.0
-  void loop(); // Call in main loop for time-proportioned control
+  // Set power in percentage (0.0 - 100.0)
+  void setPower(double dutyCycle);
+  void loop();
+
+private:
+  uint8_t _pin;
+  double _dutyCycle; // 0-100
+  unsigned long _windowStartTime;
+  unsigned long _windowSize; // Time window in ms (e.g. 1000ms or 2000ms)
+  bool _isOn;
 };
 
 #endif

@@ -35,7 +35,7 @@ enum { PARSE_REQ_START = 0,
        PARSE_REQ_FAIL = 4 };
 
 AsyncWebServerRequest::AsyncWebServerRequest(AsyncWebServer* s, AsyncClient* c)
-    : _client(c), _server(s), _handler(NULL), _response(NULL), _temp(), _parseState(PARSE_REQ_START), _version(0), _method(HTTP_ANY), _url(), _host(), _contentType(), _boundary(), _authorization(), _reqconntype(RCT_HTTP), _authMethod(AsyncAuthType::AUTH_NONE), _isMultipart(false), _isPlainPost(false), _expectingContinue(false), _contentLength(0), _parsedLength(0), _multiParseState(0), _boundaryPosition(0), _itemStartIndex(0), _itemSize(0), _itemName(), _itemFilename(), _itemType(), _itemValue(), _itemBuffer(0), _itemBufferIndex(0), _itemIsFile(false), _tempObject(NULL) {
+    : _client(c), _server(s), _handler(NULL), _response(NULL), _temp(), _parseState(PARSE_REQ_START), _version(0), _method(AWS_HTTP_ANY), _url(), _host(), _contentType(), _boundary(), _authorization(), _reqconntype(RCT_HTTP), _authMethod(AsyncAuthType::AUTH_NONE), _isMultipart(false), _isPlainPost(false), _expectingContinue(false), _contentLength(0), _parsedLength(0), _multiParseState(0), _boundaryPosition(0), _itemStartIndex(0), _itemSize(0), _itemName(), _itemFilename(), _itemType(), _itemValue(), _itemBuffer(0), _itemBufferIndex(0), _itemIsFile(false), _tempObject(NULL) {
   c->onError([](void* r, AsyncClient* c, int8_t error) { (void)c; AsyncWebServerRequest *req = (AsyncWebServerRequest*)r; req->_onError(error); }, this);
   c->onAck([](void* r, AsyncClient* c, size_t len, uint32_t time) { (void)c; AsyncWebServerRequest *req = (AsyncWebServerRequest*)r; req->_onAck(len, time); }, this);
   c->onDisconnect([](void* r, AsyncClient* c) { AsyncWebServerRequest *req = (AsyncWebServerRequest*)r; req->_onDisconnect(); delete c; }, this);
@@ -253,19 +253,19 @@ bool AsyncWebServerRequest::_parseReqHead() {
   _temp = _temp.substring(index + 1);
 
   if (m == T_GET) {
-    _method = HTTP_GET;
+    _method = AWS_HTTP_GET;
   } else if (m == T_POST) {
-    _method = HTTP_POST;
+    _method = AWS_HTTP_POST;
   } else if (m == T_DELETE) {
-    _method = HTTP_DELETE;
+    _method = AWS_HTTP_DELETE;
   } else if (m == T_PUT) {
-    _method = HTTP_PUT;
+    _method = AWS_HTTP_PUT;
   } else if (m == T_PATCH) {
-    _method = HTTP_PATCH;
+    _method = AWS_HTTP_PATCH;
   } else if (m == T_HEAD) {
-    _method = HTTP_HEAD;
+    _method = AWS_HTTP_HEAD;
   } else if (m == T_OPTIONS) {
-    _method = HTTP_OPTIONS;
+    _method = AWS_HTTP_OPTIONS;
   } else {
     return false;
   }
@@ -964,21 +964,21 @@ String AsyncWebServerRequest::urlDecode(const String& text) const {
 }
 
 const char* AsyncWebServerRequest::methodToString() const {
-  if (_method == HTTP_ANY)
+  if (_method == AWS_HTTP_ANY)
     return T_ANY;
-  if (_method & HTTP_GET)
+  if (_method & AWS_HTTP_GET)
     return T_GET;
-  if (_method & HTTP_POST)
+  if (_method & AWS_HTTP_POST)
     return T_POST;
-  if (_method & HTTP_DELETE)
+  if (_method & AWS_HTTP_DELETE)
     return T_DELETE;
-  if (_method & HTTP_PUT)
+  if (_method & AWS_HTTP_PUT)
     return T_PUT;
-  if (_method & HTTP_PATCH)
+  if (_method & AWS_HTTP_PATCH)
     return T_PATCH;
-  if (_method & HTTP_HEAD)
+  if (_method & AWS_HTTP_HEAD)
     return T_HEAD;
-  if (_method & HTTP_OPTIONS)
+  if (_method & AWS_HTTP_OPTIONS)
     return T_OPTIONS;
   return T_UNKNOWN;
 }

@@ -1,5 +1,7 @@
 #include "Configuration.h"
 #include "NetworkManager.h"
+#include "PID_Controller.h"
+#include "SSR_Driver.h"
 #include "Temperature.h"
 #include "WebServerManager.h"
 #include "config.h"
@@ -9,49 +11,55 @@
 Configuration config;
 SilviaNetworkManager networkManager(config);
 Temperature temperature;
-WebServerManager webServer(config, temperature);
+PID_Controller pid;
+SSR_Driver ssr(PIN_SSR);
+WebServerManager webServer(config, temperature, pid);
 
 void setup() {
   Serial.begin(115200);
-  // while (!Serial) { delay(10); } // Removing blocking wait
-  delay(1000); // Give some time for USB to enumerate
+  delay(1000);
   Serial.println("Rancilio Silvia PID Starting...");
 
-  // 1. Load Configuration
   config.begin();
-
-  // 2. Start Network/WiFi
-  // This might block if it goes to AP mode, which is fine for startup
   networkManager.begin();
-
-  // 3. Init Hardware
   temperature.begin();
+  pid.begin();
+  ssr.begin();
 
-  // 4. Start Web Server
   webServer.begin();
 }
 
 void loop() {
-  // Update temperature state machine
   temperature.update();
 
-  // Non-blocking print every 1 second
+  // PID Loop
+  double currentTemp = temperature.getTemperature();
+  double targetTemp = config.getTargetTemp();
+  double output = pid.compute(currentTemp, targetTemp);
+
+  ssr.setPower(output);
+  ssr.loop();
+
   static unsigned long lastPrint = 0;
   if (millis() - lastPrint >= 1000) {
     lastPrint = millis();
 
-    float currentTemp = temperature.getTemperature();
     uint8_t fault = temperature.getFault();
 
     Serial.print("Temp: ");
     Serial.print(currentTemp);
-    Serial.print(" C | Fault Code: 0x");
-    Serial.println(fault, HEX);
+    Serial.print(" C | Target: ");
+    Serial.print(targetTemp);
+    Serial.print(" | Out: ");
+    Serial.print(output);
+    Serial.print("% | Mode: ");
+    Serial.println(pid.isManualMode() ? "MANUAL" : "AUTO");
 
     if (temperature.hasFault()) {
       Serial.print("FAULT DETECTED! Code: 0x");
       Serial.println(fault, HEX);
-      // Here we would safely disable SSR
+      pid.setManualMode(true);
+      pid.setManualPower(0); // Safely disable heater
     }
   }
 }

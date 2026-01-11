@@ -111,7 +111,7 @@ AsyncStaticWebHandler& AsyncStaticWebHandler::setLastModified() {
 }
 
 bool AsyncStaticWebHandler::canHandle(AsyncWebServerRequest* request) const {
-  return request->isHTTP() && request->method() == HTTP_GET && request->url().startsWith(_uri) && _getFile(request);
+  return request->isHTTP() && request->method() == AWS_HTTP_GET && request->url().startsWith(_uri) && _getFile(request);
 }
 
 bool AsyncStaticWebHandler::_getFile(AsyncWebServerRequest* request) const {
@@ -202,55 +202,54 @@ void AsyncStaticWebHandler::handleRequest(AsyncWebServerRequest* request) {
   free(request->_tempObject);
   request->_tempObject = NULL;
 
-  if (request->_tempFile != true){
+  if (request->_tempFile != true) {
     request->send(404);
     return;
   }
 
-    time_t lw = request->_tempFile.getLastWrite(); // get last file mod time (if supported by FS)
-    // set etag to lastmod timestamp if available, otherwise to size
-    String etag;
-    if (lw) {
-      setLastModified(lw);
+  time_t lw = request->_tempFile.getLastWrite(); // get last file mod time (if supported by FS)
+  // set etag to lastmod timestamp if available, otherwise to size
+  String etag;
+  if (lw) {
+    setLastModified(lw);
 #if defined(TARGET_RP2040)
-      // time_t == long long int
-      constexpr size_t len = 1 + 8 * sizeof(time_t);
-      char buf[len];
-      char* ret = lltoa(lw ^ request->_tempFile.size(), buf, len, 10);
-      etag = ret ? String(ret) : String(request->_tempFile.size());
+    // time_t == long long int
+    constexpr size_t len = 1 + 8 * sizeof(time_t);
+    char buf[len];
+    char* ret = lltoa(lw ^ request->_tempFile.size(), buf, len, 10);
+    etag = ret ? String(ret) : String(request->_tempFile.size());
 #else
-      etag = lw ^ request->_tempFile.size();   // etag combines file size and lastmod timestamp
+    etag = lw ^ request->_tempFile.size(); // etag combines file size and lastmod timestamp
 #endif
-    } else {
-      etag = request->_tempFile.size();
-    }
+  } else {
+    etag = request->_tempFile.size();
+  }
 
-    bool not_modified = false;
+  bool not_modified = false;
 
-    // if-none-match has precedence over if-modified-since
-    if (request->hasHeader(T_INM))
-      not_modified = request->header(T_INM).equals(etag);
-    else if (_last_modified.length())
-      not_modified = request->header(T_IMS).equals(_last_modified);
+  // if-none-match has precedence over if-modified-since
+  if (request->hasHeader(T_INM))
+    not_modified = request->header(T_INM).equals(etag);
+  else if (_last_modified.length())
+    not_modified = request->header(T_IMS).equals(_last_modified);
 
-    AsyncWebServerResponse* response;
+  AsyncWebServerResponse* response;
 
-    if (not_modified){
-      request->_tempFile.close();
-      response = new AsyncBasicResponse(304); // Not modified
-    } else {
-      response = new AsyncFileResponse(request->_tempFile, filename, emptyString, false, _callback);
-    }
+  if (not_modified) {
+    request->_tempFile.close();
+    response = new AsyncBasicResponse(304); // Not modified
+  } else {
+    response = new AsyncFileResponse(request->_tempFile, filename, emptyString, false, _callback);
+  }
 
-    response->addHeader(T_ETag, etag.c_str());
+  response->addHeader(T_ETag, etag.c_str());
 
-    if (_last_modified.length())
-      response->addHeader(T_Last_Modified, _last_modified.c_str());
-    if (_cache_control.length())
-      response->addHeader(T_Cache_Control, _cache_control.c_str());
-  
-    request->send(response);
+  if (_last_modified.length())
+    response->addHeader(T_Last_Modified, _last_modified.c_str());
+  if (_cache_control.length())
+    response->addHeader(T_Cache_Control, _cache_control.c_str());
 
+  request->send(response);
 }
 
 AsyncStaticWebHandler& AsyncStaticWebHandler::setTemplateProcessor(AwsTemplateProcessor newCallback) {

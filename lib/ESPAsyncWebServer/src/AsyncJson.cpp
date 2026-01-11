@@ -86,7 +86,7 @@ AsyncCallbackJsonWebHandler::AsyncCallbackJsonWebHandler(const String& uri, ArJs
     : _uri(uri), _method(HTTP_GET | HTTP_POST | HTTP_PUT | HTTP_PATCH), _onRequest(onRequest), maxJsonBufferSize(maxJsonBufferSize), _maxContentLength(16384) {}
   #else
 AsyncCallbackJsonWebHandler::AsyncCallbackJsonWebHandler(const String& uri, ArJsonRequestHandlerFunction onRequest)
-    : _uri(uri), _method(HTTP_GET | HTTP_POST | HTTP_PUT | HTTP_PATCH), _onRequest(onRequest), _maxContentLength(16384) {}
+    : _uri(uri), _method(AWS_HTTP_GET | AWS_HTTP_POST | AWS_HTTP_PUT | AWS_HTTP_PATCH), _onRequest(onRequest), _maxContentLength(16384) {}
   #endif
 
 bool AsyncCallbackJsonWebHandler::canHandle(AsyncWebServerRequest* request) const {
@@ -96,7 +96,7 @@ bool AsyncCallbackJsonWebHandler::canHandle(AsyncWebServerRequest* request) cons
   if (_uri.length() && (_uri != request->url() && !request->url().startsWith(_uri + "/")))
     return false;
 
-  if (request->method() != HTTP_GET && !request->contentType().equalsIgnoreCase(asyncsrv::T_application_json))
+  if (request->method() != AWS_HTTP_GET && !request->contentType().equalsIgnoreCase(asyncsrv::T_application_json))
     return false;
 
   return true;
@@ -104,7 +104,7 @@ bool AsyncCallbackJsonWebHandler::canHandle(AsyncWebServerRequest* request) cons
 
 void AsyncCallbackJsonWebHandler::handleRequest(AsyncWebServerRequest* request) {
   if (_onRequest) {
-    if (request->method() == HTTP_GET) {
+    if (request->method() == AWS_HTTP_GET) {
       JsonVariant json;
       _onRequest(request, json);
       return;

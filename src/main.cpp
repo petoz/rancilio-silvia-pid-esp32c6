@@ -47,6 +47,9 @@ void loop() {
   // WS Cleanup
   webServer.loop();
 
+  // MQTT Cleanup
+  networkManager.loop();
+
   static unsigned long lastPrint = 0;
   if (millis() - lastPrint >= 500) { // 2Hz Update Rate for Chart
     lastPrint = millis();

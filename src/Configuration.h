@@ -14,6 +14,7 @@ struct ConfigData {
   float pid_ki;
   float pid_kd;
   float pid_setpoint;
+  bool mqtt_enabled; // Conditional MQTT
 };
 
 class Configuration {

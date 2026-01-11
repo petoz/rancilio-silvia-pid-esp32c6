@@ -51,11 +51,11 @@ void Temperature::updateSimulation(float heaterPower) {
   // Heating: 1000W heater on ~300ml boiler. Raises fast.
   // Cooling: Losses to environment.
 
-  float heatingRate =
-      0.5; // degC per second at 100% power (Manual tuning required)
-  float coolingRate = 0.02; // degC per second per degree above ambient
+  // Adjusted for ~140C max temp
+  float heatingRate = 3.0; // degC per second at 100% power (Increased from 0.5)
+  float coolingRate = 0.05; // degC per second per degree above ambient
 
-  float ambient = 25.0;
+  float ambient = 20.0;
 
   // Heat added
   float heat = (heaterPower / 100.0) * heatingRate * dt;

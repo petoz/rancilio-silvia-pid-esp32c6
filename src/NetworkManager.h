@@ -3,12 +3,14 @@
 
 #include "Configuration.h"
 #include <Arduino.h>
+#include <PubSubClient.h>
 #include <WiFiManager.h>
 
 class SilviaNetworkManager {
 public:
   SilviaNetworkManager(Configuration &config);
   void begin();
+  void loop();          // Added loop
   void resetSettings(); // Helper to clear wifi settings
 
 private:
@@ -27,7 +29,12 @@ private:
   WiFiManagerParameter *_p_pid_ki;
   WiFiManagerParameter *_p_pid_kd;
 
+  WiFiClient _espClient;
+  PubSubClient _mqttClient;
+  unsigned long _lastMqttReconnectAttempt = 0;
+
   void saveParamsCallback();
+  void reconnect();
 };
 
 #endif

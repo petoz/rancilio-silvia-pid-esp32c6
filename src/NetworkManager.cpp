@@ -1,7 +1,7 @@
 #include "NetworkManager.h"
 
 SilviaNetworkManager::SilviaNetworkManager(Configuration &config)
-    : _config(config) {}
+    : _config(config), _mqttClient(_espClient) {}
 
 void SilviaNetworkManager::begin() {
   // 1. Create Params
@@ -77,3 +77,48 @@ void SilviaNetworkManager::saveParamsCallback() {
 }
 
 void SilviaNetworkManager::resetSettings() { _wm.resetSettings(); }
+
+void SilviaNetworkManager::loop() {
+  if (!_config.data().mqtt_enabled) {
+    if (_mqttClient.connected()) {
+      _mqttClient.disconnect();
+    }
+    return;
+  }
+
+  if (!_mqttClient.connected()) {
+    long now = millis();
+    if (now - _lastMqttReconnectAttempt > 5000) {
+      _lastMqttReconnectAttempt = now;
+      reconnect();
+    }
+  } else {
+    _mqttClient.loop();
+  }
+}
+
+void SilviaNetworkManager::reconnect() {
+  // Basic reconnect logic
+  ConfigData &data = _config.data();
+  if (strlen(data.mqtt_server) == 0)
+    return;
+
+  _mqttClient.setServer(data.mqtt_server, data.mqtt_port);
+
+  Serial.print("Attempting MQTT connection...");
+  // Create a random client ID
+  String clientId = "SilviaESP32-";
+  clientId += String(random(0xffff), HEX);
+
+  if (_mqttClient.connect(clientId.c_str(), data.mqtt_user, data.mqtt_pass)) {
+    Serial.println("connected");
+    // Once connected, publish an announcement...
+    _mqttClient.publish("silvia/status", "online");
+    // ... and resubscribe
+    _mqttClient.subscribe("silvia/setpoint/set");
+  } else {
+    Serial.print("failed, rc=");
+    Serial.print(_mqttClient.state());
+    Serial.println(" try again in 5 seconds");
+  }
+}

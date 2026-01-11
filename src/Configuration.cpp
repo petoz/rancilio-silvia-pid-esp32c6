@@ -18,7 +18,8 @@ void Configuration::setDefaults() {
   _data.pid_kp = PID_KP_DEFAULT;
   _data.pid_ki = PID_KI_DEFAULT;
   _data.pid_kd = PID_KD_DEFAULT;
-  _data.pid_setpoint = 95.0; // Typical espresso temp
+  _data.pid_setpoint = 95.0;  // Typical espresso temp
+  _data.mqtt_enabled = false; // Disabled by default
 }
 
 void Configuration::load() {
@@ -28,6 +29,8 @@ void Configuration::load() {
     _data.mqtt_port = _prefs.getInt("mqtt_port", MQTT_PORT);
     _prefs.getString("mqtt_user", _data.mqtt_user, sizeof(_data.mqtt_user));
     _prefs.getString("mqtt_pass", _data.mqtt_pass, sizeof(_data.mqtt_pass));
+
+    _data.mqtt_enabled = _prefs.getBool("mqtt_enabled", false);
 
     _data.pid_kp = _prefs.getFloat("pid_kp", PID_KP_DEFAULT);
     _data.pid_ki = _prefs.getFloat("pid_ki", PID_KI_DEFAULT);
@@ -45,6 +48,8 @@ void Configuration::save() {
   _prefs.putInt("mqtt_port", _data.mqtt_port);
   _prefs.putString("mqtt_user", _data.mqtt_user);
   _prefs.putString("mqtt_pass", _data.mqtt_pass);
+
+  _prefs.putBool("mqtt_enabled", _data.mqtt_enabled);
 
   _prefs.putFloat("pid_kp", _data.pid_kp);
   _prefs.putFloat("pid_ki", _data.pid_ki);

@@ -20,6 +20,7 @@ void Configuration::setDefaults() {
   _data.pid_kd = PID_KD_DEFAULT;
   _data.pid_setpoint = 95.0;  // Typical espresso temp
   _data.mqtt_enabled = false; // Disabled by default
+  _data.heater_enabled = true;
 }
 
 void Configuration::load() {
@@ -31,6 +32,7 @@ void Configuration::load() {
     _prefs.getString("mqtt_pass", _data.mqtt_pass, sizeof(_data.mqtt_pass));
 
     _data.mqtt_enabled = _prefs.getBool("mqtt_enabled", false);
+    _data.heater_enabled = _prefs.getBool("heater_enabled", true); // Default ON
 
     _data.pid_kp = _prefs.getFloat("pid_kp", PID_KP_DEFAULT);
     _data.pid_ki = _prefs.getFloat("pid_ki", PID_KI_DEFAULT);
@@ -50,6 +52,7 @@ void Configuration::save() {
   _prefs.putString("mqtt_pass", _data.mqtt_pass);
 
   _prefs.putBool("mqtt_enabled", _data.mqtt_enabled);
+  _prefs.putBool("heater_enabled", _data.heater_enabled);
 
   _prefs.putFloat("pid_kp", _data.pid_kp);
   _prefs.putFloat("pid_ki", _data.pid_ki);

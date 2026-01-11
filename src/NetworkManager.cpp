@@ -110,15 +110,66 @@ void SilviaNetworkManager::reconnect() {
   String clientId = "SilviaESP32-";
   clientId += String(random(0xffff), HEX);
 
-  if (_mqttClient.connect(clientId.c_str(), data.mqtt_user, data.mqtt_pass)) {
+  if (_mqttClient.connect(clientId.c_str(), _config.data().mqtt_user,
+                          _config.data().mqtt_pass)) {
     Serial.println("connected");
     // Once connected, publish an announcement...
     _mqttClient.publish("silvia/status", "online");
     // ... and resubscribe
     _mqttClient.subscribe("silvia/setpoint/set");
+
+    // Auto-Discovery
+    sendDiscoveryConfig();
   } else {
     Serial.print("failed, rc=");
     Serial.print(_mqttClient.state());
     Serial.println(" try again in 5 seconds");
   }
+}
+
+void SilviaNetworkManager::sendDiscoveryConfig() {
+  // Common Device info
+  String device =
+      "\"device\":{\"identifiers\":[\"silvia_pid\"],\"name\":\"Rancilio Silvia "
+      "PID\",\"manufacturer\":\"Rancilio\",\"model\":\"Silvia "
+      "V3\",\"sw_version\":\"1.0.0\"}";
+
+  // 1. Current Temperature (Sensor)
+  String tempPayload =
+      "{\"name\": \"Silvia Temperature\", \"unique_id\": \"silvia_temp\", "
+      "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
+      "value_json.temp }}\", \"unit_of_measurement\": \"°C\", "
+      "\"device_class\": \"temperature\", " +
+      device + "}";
+  _mqttClient.publish("homeassistant/sensor/silvia/temperature/config",
+                      tempPayload.c_str(), true);
+
+  // 2. Target Temperature (Sensor for now, eventually Number)
+  String targetPayload =
+      "{\"name\": \"Silvia Target\", \"unique_id\": \"silvia_target\", "
+      "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
+      "value_json.target }}\", \"unit_of_measurement\": \"°C\", "
+      "\"device_class\": \"temperature\", " +
+      device + "}";
+  _mqttClient.publish("homeassistant/sensor/silvia/target/config",
+                      targetPayload.c_str(), true);
+
+  // 3. Output (Sensor)
+  String outputPayload =
+      "{\"name\": \"Silvia Heater Output\", \"unique_id\": \"silvia_output\", "
+      "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
+      "value_json.output }}\", \"unit_of_measurement\": \"%\", \"icon\": "
+      "\"mdi:radiator\", " +
+      device + "}";
+  _mqttClient.publish("homeassistant/sensor/silvia/output/config",
+                      outputPayload.c_str(), true);
+
+  // 4. State (Sensor)
+  String statePayload =
+      "{\"name\": \"Silvia State\", \"unique_id\": \"silvia_state\", "
+      "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
+      "value_json.state }}\",  \"icon\": \"mdi:coffee-maker\", " +
+      device + "}";
+  _mqttClient.publish("homeassistant/sensor/silvia/state/config",
+                      statePayload.c_str(), true);
 }

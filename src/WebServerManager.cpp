@@ -1,144 +1,6 @@
 #include "WebServerManager.h"
 
-// HTML Application (Minified for embedding)
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rancilio Silvia PID</title>
-    <style>
-        :root { --primary: #e74c3c; --bg: #1a1a1a; --card: #2d2d2d; --text: #ecf0f1; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 480px; }
-        .card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        h1, h2 { margin-top: 0; text-align: center; }
-        .header-info { display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; margin-bottom: 10px; }
-        .temp-display { font-size: 4rem; font-weight: bold; text-align: center; margin: 20px 0; color: var(--primary); }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; text-align: center; }
-        .label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 5px; }
-        .value { font-size: 1.2rem; font-weight: bold; }
-        input[type="number"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
-        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button.secondary { background: #555; }
-        button:active { filter: brightness(0.9); }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
-        .badge.on { background: #2ecc71; color: #fff; }
-        .badge.off { background: #7f8c8d; color: #fff; }
-        .badge.warn { background: #f39c12; color: #fff; }
-        a.ota-link { display: block; text-align: center; color: #888; margin-top: 20px; text-decoration: none; font-size: 0.8rem; }
-        /* Switch CSS */
-        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--primary); }
-        input:checked + .slider:before { transform: translateX(26px); }
-        input[type="text"], input[type="password"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
-    </style>
-</head>
-<body>
-    <!-- (Existing HTML...) -->
-
-    <script>
-        // ... (Existing Chart/WS setup) ...
-
-        function toggleMqttFields() {
-            const enabled = document.getElementById('mqttToggle').checked;
-            document.getElementById('mqttFields').style.display = enabled ? 'block' : 'none';
-        }
-
-        // Combined Config Update (PID + MQTT)
-        async function updateConfig() {
-            // PID
-            const kp = document.getElementById('kpInput').value;
-            const ki = document.getElementById('kiInput').value;
-            const kd = document.getElementById('kdInput').value;
-            
-            // MQTT
-            const mqttEnabled = document.getElementById('mqttToggle').checked;
-            const mqttServer = document.getElementById('mqttServer').value;
-            const mqttPort = document.getElementById('mqttPort').value;
-            const mqttUser = document.getElementById('mqttUser').value;
-            const mqttPass = document.getElementById('mqttPass').value;
-
-            try {
-                await fetch('/api/config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        pid_kp: parseFloat(kp), 
-                        pid_ki: parseFloat(ki), 
-                        pid_kd: parseFloat(kd),
-                        mqtt_enabled: mqttEnabled,
-                        mqtt_server: mqttServer,
-                        mqtt_port: parseInt(mqttPort),
-                        mqtt_user: mqttUser,
-                        mqtt_pass: mqttPass
-                    })
-                });
-                alert('Configuration Saved!');
-                // Reload to reflect state? 
-            } catch (e) { alert('Failed to update settings'); }
-        }
-        
-        // Removed old updatePID in favor of unified config or keep separate?
-        // User asked for "Save PID Settings" in PID card, and "Save Configuration" in MQTT card?
-        // Let's keep updatePID for the PID card button, and make the new button call updateConfig which saves EVERYTHING including PID.
-        
-        async function updatePID() {
-             updateConfig(); // Reuse the main function
-        }
-    
-       // ... (Remainder of script) ...
-
-        async function fetchInitialConfig() {
-            try {
-               const response = await fetch('/api/status');
-               const data = await response.json();
-               firstLoad = true; 
-               
-               // PID
-               document.getElementById('setpointInput').value = data.target;
-               document.getElementById('kpInput').value = data.kp;
-               document.getElementById('kiInput').value = data.ki;
-               document.getElementById('kdInput').value = data.kd;
-               
-               // MQTT
-               document.getElementById('mqttToggle').checked = data.mqtt_enabled;
-               document.getElementById('mqttServer').value = data.mqtt_server;
-               document.getElementById('mqttPort').value = data.mqtt_port;
-               document.getElementById('mqttUser').value = data.mqtt_user;
-               document.getElementById('mqttPass').value = data.mqtt_pass;
-               
-               toggleMqttFields();
-               
-               firstLoad = false;
-            } catch(e){}
-        }
-
-
-        async function toggleOverride() {
-             const isManual = document.getElementById('overrideBtn').textContent.includes("Disable");
-             try {
-                await fetch('/api/override', { 
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'state=' + (!isManual) 
-                });
-            } catch (e) { alert('Failed to toggle override'); }
-        }
-
-        // Start
-        fetchInitialConfig();
-        initWebSocket();
-    </script>
-</body>
-</html>
-
-)rawliteral";
+#include "index_html.h"
 
 WebServerManager::WebServerManager(Configuration &config, Temperature &temp,
                                    PID_Controller &pid)
@@ -182,7 +44,11 @@ void WebServerManager::broadcastStatus() {
   doc["rssi"] = WiFi.RSSI();
   doc["uptime"] = millis();
   doc["manual"] = _pid.isManualMode();
+  doc["rssi"] = WiFi.RSSI();
+  doc["uptime"] = millis();
+  doc["manual"] = _pid.isManualMode();
   doc["heating"] = (_pid.getOutput() > 0);
+  doc["heater_enabled"] = _config.data().heater_enabled;
 
   // Only send changing data for chart/status
   String response;
@@ -193,7 +59,7 @@ void WebServerManager::broadcastStatus() {
 void WebServerManager::setupRoutes() {
   // 1. Serve Dashboard
   _server.on("/", AWS_HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/html", index_html);
+    request->send_P(200, "text/html", index_html);
   });
 
   // 2. API Status Endpoint
@@ -224,7 +90,11 @@ void WebServerManager::setupRoutes() {
                doc["rssi"] = WiFi.RSSI();
                doc["uptime"] = millis();
                doc["manual"] = _pid.isManualMode();
+               doc["rssi"] = WiFi.RSSI();
+               doc["uptime"] = millis();
+               doc["manual"] = _pid.isManualMode();
                doc["heating"] = (_pid.getOutput() > 0);
+               doc["heater_enabled"] = _config.data().heater_enabled;
 
                String response;
                serializeJson(doc, response);
@@ -298,11 +168,18 @@ void WebServerManager::setupRoutes() {
              [this](AsyncWebServerRequest *request) {
                if (request->hasParam("state", true)) {
                  String stateStr = request->getParam("state", true)->value();
-                 bool state = (stateStr == "true");
-                 _pid.setManualMode(state);
-                 if (state) {
-                   _pid.setManualPower(
-                       100.0); // Default to full power for manual override test
+                 bool turnOn = (stateStr == "true");
+
+                 _config.data().heater_enabled = turnOn;
+                 _config.save(); // Persist
+
+                 if (turnOn) {
+                   // Resume Auto PID
+                   _pid.setManualMode(false);
+                 } else {
+                   // Force Off (Manual 0%)
+                   _pid.setManualMode(true);
+                   _pid.setManualPower(0.0);
                  }
                }
                request->send(200, "application/json", "{\"status\":\"ok\"}");

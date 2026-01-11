@@ -23,7 +23,14 @@ void setup() {
   config.begin();
   networkManager.begin();
   temperature.begin();
-  pid.begin();
+  // 4. Initialize PID
+  if (config.data().heater_enabled) {
+    pid.begin(); // Auto mode
+  } else {
+    pid.begin();
+    pid.setManualMode(true);
+    pid.setManualPower(0);
+  }
   ssr.begin();
 
   webServer.begin();

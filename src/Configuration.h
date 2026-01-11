@@ -14,7 +14,9 @@ struct ConfigData {
   float pid_ki;
   float pid_kd;
   float pid_setpoint;
-  bool mqtt_enabled; // Conditional MQTT
+  bool mqtt_enabled;
+  bool
+      heater_enabled; // Persistence for Heater ON/OFF state // Conditional MQTT
 };
 
 class Configuration {

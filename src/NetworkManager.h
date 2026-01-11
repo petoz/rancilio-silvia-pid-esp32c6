@@ -10,7 +10,8 @@ class SilviaNetworkManager {
 public:
   SilviaNetworkManager(Configuration &config);
   void begin();
-  void loop();          // Added loop
+  void loop();
+  void sendDiscoveryConfig();
   void resetSettings(); // Helper to clear wifi settings
 
 private:

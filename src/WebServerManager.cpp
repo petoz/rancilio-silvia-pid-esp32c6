@@ -20,7 +20,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         .stat-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; text-align: center; }
         .label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 5px; }
         .value { font-size: 1.2rem; font-weight: bold; }
-        input[type="number"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; }
+        input[type="number"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
         button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
         button.secondary { background: #555; }
         button:active { filter: brightness(0.9); }
@@ -49,6 +49,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                     <span class="label">Heater</span>
                     <span class="badge off" id="heaterState">OFF</span>
                 </div>
+                <div class="stat-item">
+                     <span class="label">Output</span>
+                     <span class="value" id="pidOutput">0%</span>
+                </div>
+                 <div class="stat-item">
+                     <span class="label">Mode</span>
+                     <span class="value" id="sysMode">--</span>
+                </div>
             </div>
         </div>
 
@@ -58,6 +66,17 @@ const char index_html[] PROGMEM = R"rawliteral(
             <input type="number" id="setpointInput" step="0.1" value="95.0">
             <button onclick="updateSetpoint()">Update Target</button>
             <button class="secondary" onclick="toggleOverride()" id="overrideBtn" style="margin-top: 20px;">Enable Manual Heater Override</button>
+        </div>
+
+        <div class="card">
+            <h2>PID Tuning</h2>
+            <label class="label">Proportional (Kp)</label>
+            <input type="number" id="kpInput" step="0.1">
+            <label class="label">Integral (Ki)</label>
+            <input type="number" id="kiInput" step="0.01">
+            <label class="label">Derivative (Kd)</label>
+            <input type="number" id="kdInput" step="0.1">
+            <button onclick="updatePID()">Save PID Settings</button>
         </div>
 
         <a href="/update" class="ota-link">Update Firmware (OTA)</a>
@@ -73,13 +92,17 @@ const char index_html[] PROGMEM = R"rawliteral(
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
+        let firstLoad = true;
         function updateUI(data) {
             document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
-            document.getElementById('targetTemp').textContent = data.setpoint.toFixed(1) + '°C';
+            document.getElementById('targetTemp').textContent = data.target.toFixed(1) + '°C';
             const heater = document.getElementById('heaterState');
             heater.textContent = data.heating ? 'ON' : 'OFF';
             heater.className = 'badge ' + (data.heating ? 'on' : 'off');
             
+            document.getElementById('pidOutput').textContent = data.output.toFixed(0) + '%';
+            document.getElementById('sysMode').textContent = data.state;
+
             document.getElementById('rssi').textContent = `WiFi: ${data.rssi} dBm`;
             document.getElementById('uptime').textContent = `Up: ${formatTime(data.uptime)}`;
 
@@ -90,6 +113,14 @@ const char index_html[] PROGMEM = R"rawliteral(
             } else {
                 overrideBtn.textContent = "Enable Manual Heater Override";
                 overrideBtn.style.background = "#555";
+            }
+
+            if (firstLoad) {
+                document.getElementById('setpointInput').value = data.target;
+                document.getElementById('kpInput').value = data.kp;
+                document.getElementById('kiInput').value = data.ki;
+                document.getElementById('kdInput').value = data.kd;
+                firstLoad = false;
             }
         }
 
@@ -113,9 +144,36 @@ const char index_html[] PROGMEM = R"rawliteral(
             } catch (e) { alert('Failed to update setpoint'); }
         }
 
+        async function updatePID() {
+            const kp = document.getElementById('kpInput').value;
+            const ki = document.getElementById('kiInput').value;
+            const kd = document.getElementById('kdInput').value;
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        pid_kp: parseFloat(kp), 
+                        pid_ki: parseFloat(ki), 
+                        pid_kd: parseFloat(kd)
+                    })
+                });
+                alert('PID Settings Saved!');
+                fetchStatus();
+            } catch (e) { alert('Failed to update PID settings'); }
+        }
+
         async function toggleOverride() {
+             // Retrieve current state logic would be better, but simple toggle request works since backend handles logic
+             // Ideally we pass desired state, but let's assume toggle for now
+             // Actually, the button text depends on state, so we know current state
+             const isManual = document.getElementById('overrideBtn').textContent.includes("Disable");
              try {
-                await fetch('/api/override', { method: 'POST' });
+                await fetch('/api/override', { 
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'state=' + (!isManual) 
+                });
                 fetchStatus();
             } catch (e) { alert('Failed to toggle override'); }
         }
@@ -149,20 +207,18 @@ void WebServerManager::setupRoutes() {
                doc["temp"] = _temp.getTemperature();
                doc["target"] = _config.getTargetTemp();
                doc["output"] = _pid.getOutput();
-               doc["state"] =
-                   _pid.isManualMode() ? "MANUAL" : "IDLE"; // Simplified state
-               if (_pid.getOutput() > 0)
+               doc["state"] = _pid.isManualMode() ? "MANUAL" : "AUTO";
+               if (_pid.getOutput() > 0 && !_pid.isManualMode())
                  doc["state"] = "HEATING";
-               doc["setpoint"] = 95.0; // Placeholder until PID integrated
-               doc["heating"] = false; // Placeholder
+
                doc["kp"] = _config.data().pid_kp;
                doc["ki"] = _config.data().pid_ki;
                doc["kd"] = _config.data().pid_kd;
 
-               // New Fields
                doc["rssi"] = WiFi.RSSI();
                doc["uptime"] = millis();
-               doc["manual"] = false; // Placeholder for manual mode state
+               doc["manual"] = _pid.isManualMode();
+               doc["heating"] = (_pid.getOutput() > 0);
 
                String response;
                serializeJson(doc, response);
@@ -173,13 +229,14 @@ void WebServerManager::setupRoutes() {
   _server.on(
       "/api/setpoint", AWS_HTTP_POST, [](AsyncWebServerRequest *request) {},
       NULL,
-      [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-         size_t index, size_t total) {
+      [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+             size_t index, size_t total) {
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, data, len);
         if (!error) {
           float newSetpoint = doc["setpoint"];
-          Serial.printf("New Setpoint: %.1f\n", newSetpoint);
+          _config.data().pid_setpoint = newSetpoint;
+          _config.save();
           request->send(200, "application/json", "{\"status\":\"ok\"}");
         } else {
           request->send(400, "application/json",
@@ -187,16 +244,45 @@ void WebServerManager::setupRoutes() {
         }
       });
 
-  // 4. API Manual Override Endpoint (Stub)
+  // 4. API Config Endpoint (PID)
   _server.on(
-      "/api/override", AWS_HTTP_POST, [](AsyncWebServerRequest *request) {},
-      NULL,
-      [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-         size_t index, size_t total) {
-        // Stub for manual override
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
+      "/api/config", AWS_HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+      [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+             size_t index, size_t total) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, data, len);
+        if (!error) {
+          if (doc.containsKey("pid_kp"))
+            _config.data().pid_kp = doc["pid_kp"];
+          if (doc.containsKey("pid_ki"))
+            _config.data().pid_ki = doc["pid_ki"];
+          if (doc.containsKey("pid_kd"))
+            _config.data().pid_kd = doc["pid_kd"];
+          _config.save();
+          // Apply new tunings immediately
+          _pid.setTunings(_config.data().pid_kp, _config.data().pid_ki,
+                          _config.data().pid_kd);
+          request->send(200, "application/json", "{\"status\":\"ok\"}");
+        } else {
+          request->send(400, "application/json",
+                        "{\"error\":\"Invalid JSON\"}");
+        }
       });
 
-  // Start ElegantOTA
+  // 5. API Manual Override Endpoint
+  _server.on("/api/override", AWS_HTTP_POST,
+             [this](AsyncWebServerRequest *request) {
+               if (request->hasParam("state", true)) {
+                 String stateStr = request->getParam("state", true)->value();
+                 bool state = (stateStr == "true");
+                 _pid.setManualMode(state);
+                 if (state) {
+                   _pid.setManualPower(
+                       100.0); // Default to full power for manual override test
+                 }
+               }
+               request->send(200, "application/json", "{\"status\":\"ok\"}");
+             });
+
   ElegantOTA.begin(&_server);
 }

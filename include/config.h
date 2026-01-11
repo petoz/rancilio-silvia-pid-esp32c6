@@ -24,6 +24,9 @@
 #define TEMP_MIN_LIMIT 0.0   // Celsius (Sanity check)
 #define TEMP_EMA_ALPHA 0.2   // Exponential Moving Average coefficient
 
+// --- Simulation ---
+#define SIMULATION_MODE 1 // Set to 1 to enable software boiler simulation
+
 // --- WiFi & MQTT Configuration ---
 // Note: In a real production environment, use secrets.h or WiFiManager
 #define WIFI_SSID "YOUR_WIFI_SSID"

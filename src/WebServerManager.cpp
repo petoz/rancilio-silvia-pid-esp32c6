@@ -79,10 +79,101 @@ const char index_html[] PROGMEM = R"rawliteral(
             <button onclick="updatePID()">Save PID Settings</button>
         </div>
 
-        <a href="/update" class="ota-link">Update Firmware (OTA)</a>
+    <div class="card">
+        <h2>Temperature History</h2>
+        <canvas id="tempChart" width="400" height="200"></canvas>
     </div>
 
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0"></script> 
+    <!-- Note: Streaming plugin needs moment/adapter often, going with simple push for now -->
+    
     <script>
+        // Chart Initialization
+        const ctx = document.getElementById('tempChart').getContext('2d');
+        const maxDataPoints = 60; // 30 seconds at 2Hz
+        const tempChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(maxDataPoints).fill(''),
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: Array(maxDataPoints).fill(null),
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Target (°C)',
+                        data: Array(maxDataPoints).fill(null),
+                        borderColor: '#2ecc71',
+                        borderDash: [5, 5],
+                        fill: false,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Output (%)',
+                        data: Array(maxDataPoints).fill(null),
+                        borderColor: '#f1c40f',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: true,
+                        backgroundColor: 'rgba(241, 196, 15, 0.1)',
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                animation: false, // Performance
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        type: 'linear', display: true, position: 'left',
+                        suggestedMin: 20, suggestedMax: 110,
+                        grid: { color: '#444' }, title: {display: true, text: 'Temp (°C)'}
+                    },
+                    y1: {
+                        type: 'linear', display: true, position: 'right',
+                        min: 0, max: 105,
+                        grid: { drawOnChartArea: false }, title: {display : true, text: 'Output %'}
+                    }
+                },
+                plugins: { legend: { labels: { color: '#ccc' } } }
+            }
+        });
+
+        function addData(chart, temp, target, output) {
+            chart.data.datasets[0].data.push(temp);
+            chart.data.datasets[1].data.push(target);
+            chart.data.datasets[2].data.push(output);
+            
+            if (chart.data.datasets[0].data.length > maxDataPoints) {
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[1].data.shift();
+                chart.data.datasets[2].data.shift();
+            }
+            chart.update();
+        }
+
+        // WebSockets
+        let socket;
+        function initWebSocket() {
+            socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+            socket.onopen = function(e) { console.log("WS Connected"); };
+            socket.onclose = function(e) { console.log("WS Disconnected"); setTimeout(initWebSocket, 2000); };
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateUI(data); // Use existing UI updater
+                addData(tempChart, data.temp, data.target, data.output);
+            };
+        }
+
         function formatTime(ms) {
             let seconds = Math.floor(ms / 1000);
             let minutes = Math.floor(seconds / 60);
@@ -116,22 +207,27 @@ const char index_html[] PROGMEM = R"rawliteral(
             }
 
             if (firstLoad) {
+                // ... (Existing first load logic if needed, but data usually partial in WS)
+                // For full config we might still fetch /api/status or config once
+            }
+        }
+        
+        // Use Fetch for initial Full Config (P, I, D) which might not be in every WS packet to save bandwidth
+        async function fetchInitialConfig() {
+            try {
+               const response = await fetch('/api/status'); // Get full status once
+               const data = await response.json();
+               firstLoad = true; 
+               // Init inputs
                 document.getElementById('setpointInput').value = data.target;
                 document.getElementById('kpInput').value = data.kp;
                 document.getElementById('kiInput').value = data.ki;
                 document.getElementById('kdInput').value = data.kd;
                 firstLoad = false;
-            }
+            } catch(e){}
         }
 
-        async function fetchStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                updateUI(data);
-            } catch (e) { console.error(e); }
-        }
-
+        // Helper functions (updateSetpoint, updatePID, toggleOverride) remain...
         async function updateSetpoint() {
             const val = document.getElementById('setpointInput').value;
             try {
@@ -140,7 +236,6 @@ const char index_html[] PROGMEM = R"rawliteral(
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({setpoint: parseFloat(val)})
                 });
-                fetchStatus();
             } catch (e) { alert('Failed to update setpoint'); }
         }
 
@@ -159,14 +254,10 @@ const char index_html[] PROGMEM = R"rawliteral(
                     })
                 });
                 alert('PID Settings Saved!');
-                fetchStatus();
             } catch (e) { alert('Failed to update PID settings'); }
         }
 
         async function toggleOverride() {
-             // Retrieve current state logic would be better, but simple toggle request works since backend handles logic
-             // Ideally we pass desired state, but let's assume toggle for now
-             // Actually, the button text depends on state, so we know current state
              const isManual = document.getElementById('overrideBtn').textContent.includes("Disable");
              try {
                 await fetch('/api/override', { 
@@ -174,24 +265,66 @@ const char index_html[] PROGMEM = R"rawliteral(
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: 'state=' + (!isManual) 
                 });
-                fetchStatus();
             } catch (e) { alert('Failed to toggle override'); }
         }
 
-        setInterval(fetchStatus, 1000);
-        fetchStatus();
+        // Start
+        fetchInitialConfig();
+        initWebSocket();
     </script>
 </body>
 </html>
+
 )rawliteral";
 
 WebServerManager::WebServerManager(Configuration &config, Temperature &temp,
                                    PID_Controller &pid)
-    : _server(80), _config(config), _temp(temp), _pid(pid) {}
+    : _server(80), _ws("/ws"), _config(config), _temp(temp), _pid(pid) {}
 
 void WebServerManager::begin() {
   setupRoutes();
+  _ws.onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client,
+                     AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    this->onEvent(server, client, type, arg, data, len);
+  });
+  _server.addHandler(&_ws);
   _server.begin();
+}
+
+void WebServerManager::loop() { _ws.cleanupClients(); }
+
+void WebServerManager::onEvent(AsyncWebSocket *server,
+                               AsyncWebSocketClient *client, AwsEventType type,
+                               void *arg, uint8_t *data, size_t len) {
+  if (type == WS_EVT_CONNECT) {
+    // Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
+    // Could send initial status here immediately
+  } else if (type == WS_EVT_DISCONNECT) {
+    // Serial.printf("ws[%s][%u] disconnect\n", server->url(), client->id());
+  }
+}
+
+void WebServerManager::broadcastStatus() {
+  if (_ws.count() == 0)
+    return;
+
+  JsonDocument doc;
+  doc["temp"] = _temp.getTemperature();
+  doc["target"] = _config.getTargetTemp();
+  doc["output"] = _pid.getOutput();
+  doc["state"] = _pid.isManualMode() ? "MANUAL" : "AUTO";
+  if (_pid.getOutput() > 0 && !_pid.isManualMode())
+    doc["state"] = "HEATING";
+
+  doc["rssi"] = WiFi.RSSI();
+  doc["uptime"] = millis();
+  doc["manual"] = _pid.isManualMode();
+  doc["heating"] = (_pid.getOutput() > 0);
+
+  // Only send changing data for chart/status
+  String response;
+  serializeJson(doc, response);
+  _ws.textAll(response);
 }
 
 void WebServerManager::setupRoutes() {

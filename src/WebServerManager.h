@@ -14,15 +14,20 @@ public:
   WebServerManager(Configuration &config, Temperature &temp,
                    PID_Controller &pid);
   void begin();
+  void loop();
+  void broadcastStatus();
 
 private:
   AsyncWebServer _server;
+  AsyncWebSocket _ws;
   Configuration &_config;
   Temperature &_temp;
   PID_Controller &_pid;
 
   void setupRoutes();
   String getContentType(String filename);
+  void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+               AwsEventType type, void *arg, uint8_t *data, size_t len);
 };
 
 #endif

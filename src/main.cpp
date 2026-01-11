@@ -40,20 +40,24 @@ void loop() {
   ssr.setPower(output);
   ssr.loop();
 
+#ifdef SIMULATION_MODE
+  temperature.updateSimulation(output);
+#endif
+
+  // WS Cleanup
+  webServer.loop();
+
   static unsigned long lastPrint = 0;
-  if (millis() - lastPrint >= 1000) {
+  if (millis() - lastPrint >= 500) { // 2Hz Update Rate for Chart
     lastPrint = millis();
 
     uint8_t fault = temperature.getFault();
 
-    Serial.print("Temp: ");
-    Serial.print(currentTemp);
-    Serial.print(" C | Target: ");
-    Serial.print(targetTemp);
-    Serial.print(" | Out: ");
-    Serial.print(output);
-    Serial.print("% | Mode: ");
-    Serial.println(pid.isManualMode() ? "MANUAL" : "AUTO");
+    // Serial Debug (keep it verbose for now) // Slower serial if needed or
+    // commented out Serial.print("Temp: "); ...
+
+    // Broadcast WebSocket
+    webServer.broadcastStatus();
 
     if (temperature.hasFault()) {
       Serial.print("FAULT DETECTED! Code: 0x");

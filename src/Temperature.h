@@ -48,6 +48,13 @@ private:
   unsigned long _lastStateChangeTime;
   unsigned long _lastReadAttempt;
   const unsigned long _readInterval = 1000;
+
+  // Simulation
+  float _simTemp;
+  unsigned long _lastSimTime;
+
+public:
+  void updateSimulation(float heaterPower); // 0-100%
 };
 
 #endif

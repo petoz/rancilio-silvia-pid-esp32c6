@@ -32,6 +32,38 @@ void Temperature::begin() {
   writeRegister8(MAX31865_CONFIG_REG, config);
 
   _state = IDLE;
+
+  // Sim init
+  _simTemp = 20.0; // Ambient start
+  _lastSimTime = millis();
+}
+
+void Temperature::updateSimulation(float heaterPower) {
+  // heaterPower is 0-100
+  unsigned long now = millis();
+  float dt = (now - _lastSimTime) / 1000.0; // Seconds
+  _lastSimTime = now;
+
+  if (dt > 1.0)
+    dt = 1.0; // Cap lag
+
+  // Simple Boiler Thermal Model
+  // Heating: 1000W heater on ~300ml boiler. Raises fast.
+  // Cooling: Losses to environment.
+
+  float heatingRate =
+      0.5; // degC per second at 100% power (Manual tuning required)
+  float coolingRate = 0.02; // degC per second per degree above ambient
+
+  float ambient = 25.0;
+
+  // Heat added
+  float heat = (heaterPower / 100.0) * heatingRate * dt;
+
+  // Heat lost
+  float loss = (_simTemp - ambient) * coolingRate * dt;
+
+  _simTemp = _simTemp + heat - loss;
 }
 
 void Temperature::update() {
@@ -108,11 +140,29 @@ void Temperature::update() {
   }
 }
 
-float Temperature::getTemperature() { return _smoothedTemp; }
+float Temperature::getTemperature() {
+#ifdef SIMULATION_MODE
+  return _simTemp;
+#else
+  return _smoothedTemp;
+#endif
+}
 
-uint8_t Temperature::getFault() { return _lastFault; }
+uint8_t Temperature::getFault() {
+#ifdef SIMULATION_MODE
+  return 0; // No faults in sim
+#else
+  return _lastFault;
+#endif
+}
 
-bool Temperature::hasFault() { return _lastFault != 0; }
+bool Temperature::hasFault() {
+#ifdef SIMULATION_MODE
+  return false;
+#else
+  return _lastFault != 0;
+#endif
+}
 
 // --- SPI Helpers ---
 

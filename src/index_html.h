@@ -22,23 +22,11 @@ const char index_html[] PROGMEM = R"rawliteral(
         .stat-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; text-align: center; }
         .label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 5px; }
         .value { font-size: 1.2rem; font-weight: bold; }
-        input[type="number"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
-        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button.secondary { background: #555; }
-        button:active { filter: brightness(0.9); }
         .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
         .badge.on { background: #2ecc71; color: #fff; }
         .badge.off { background: #7f8c8d; color: #fff; }
-        .badge.warn { background: #f39c12; color: #fff; }
-        a.ota-link { display: block; text-align: center; color: #888; margin-top: 20px; text-decoration: none; font-size: 0.8rem; }
-        /* Switch CSS */
-        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--primary); }
-        input:checked + .slider:before { transform: translateX(26px); }
-        input[type="text"], input[type="password"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
+        a.button { display: block; width: 100%; padding: 12px; background: var(--primary); color: white; text-align: center; text-decoration: none; border-radius: 6px; font-size: 1rem; font-weight: bold; box-sizing: border-box; margin-top: 20px; }
+        a.button:active { filter: brightness(0.9); }
     </style>
 </head>
 <body>
@@ -71,56 +59,11 @@ const char index_html[] PROGMEM = R"rawliteral(
         </div>
 
         <div class="card">
-            <h2>Controls</h2>
-            <label class="label">Set Target Temperature (°C)</label>
-            <input type="number" id="setpointInput" step="0.1" value="95.0">
-            <button onclick="updateSetpoint()">Update Target</button>
-            <button class="secondary" onclick="toggleOverride()" id="overrideBtn" style="margin-top: 20px;">Heater Power: CHECKING...</button>
-        </div>
-
-        <div class="card">
-            <h2>PID Tuning</h2>
-            <label class="label">Proportional (Kp)</label>
-            <input type="number" id="kpInput" step="0.1">
-            <label class="label">Integral (Ki)</label>
-            <input type="number" id="kiInput" step="0.01">
-            <label class="label">Derivative (Kd)</label>
-            <input type="number" id="kdInput" step="0.1">
-            <button onclick="updatePID()">Save PID Settings</button>
-        </div>
-
-        <div class="card">
-            <h2>MQTT / Home Assistant</h2>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                <label class="label" style="margin:0;">Enable Integration</label>
-                <label class="switch">
-                <input type="checkbox" id="mqttToggle" onchange="toggleMqttFields()">
-                <span class="slider round"></span>
-                </label>
-            </div>
-            
-            <div id="mqttFields" style="display:none;">
-                <label class="label">Broker Address</label>
-                <input type="text" id="mqttServer" placeholder="192.168.1.x">
-                
-                <label class="label">Port</label>
-                <input type="number" id="mqttPort" placeholder="1883">
-                
-                <label class="label">Username</label>
-                <input type="text" id="mqttUser">
-                
-                <label class="label">Password</label>
-                <input type="password" id="mqttPass">
-            </div>
-            <button onclick="updateConfig()">Save Configuration</button>
-        </div>
-
-        <div class="card">
             <h2>Temperature History</h2>
             <canvas id="tempChart" width="400" height="200"></canvas>
         </div>
         
-        <a href="/update" class="ota-link">Firmware Update (OTA)</a>
+        <a href="/settings" class="button">Settings</a>
     </div> 
 
     <!-- Chart.js CDN -->
@@ -221,7 +164,6 @@ const char index_html[] PROGMEM = R"rawliteral(
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        let firstLoad = true;
         function updateUI(data) {
             document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
             document.getElementById('targetTemp').textContent = data.target.toFixed(1) + '°C';
@@ -234,25 +176,129 @@ const char index_html[] PROGMEM = R"rawliteral(
 
             document.getElementById('rssi').textContent = `WiFi: ${data.rssi} dBm`;
             document.getElementById('uptime').textContent = `Up: ${formatTime(data.uptime)}`;
-
-            const overrideBtn = document.getElementById('overrideBtn');
-            if (data.heater_enabled) {
-                overrideBtn.textContent = "Turn Heater OFF";
-                overrideBtn.style.background = "#e74c3c"; // Red to stop
-            } else {
-                overrideBtn.textContent = "Turn Heater ON";
-                overrideBtn.style.background = "#2ecc71"; // Green to start
-            }
         }
         
+        initWebSocket();
+    </script>
+</body>
+</html>
+)rawliteral";
+
+const char settings_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Silvia PID</title>
+    <style>
+        :root { --primary: #e74c3c; --bg: #1a1a1a; --card: #2d2d2d; --text: #ecf0f1; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 480px; }
+        .card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h1, h2 { margin-top: 0; text-align: center; }
+        .label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 5px; }
+        input[type="number"], input[type="text"], input[type="password"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
+        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button.secondary { background: #555; }
+        button:active { filter: brightness(0.9); }
+        a.ota-link { display: block; text-align: center; color: #888; margin-top: 20px; text-decoration: none; font-size: 0.8rem; }
+        a.back-link { display: inline-block; margin-bottom: 20px; color: var(--primary); text-decoration: none; font-weight: bold; }
+        /* Switch CSS */
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(26px); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">&larr; Back to Dashboard</a>
+        
+        <div class="card">
+            <h2>Controls</h2>
+            <label class="label">Set Target Temperature (°C)</label>
+            <input type="number" id="setpointInput" step="0.1" value="95.0">
+            <button onclick="updateSetpoint()">Update Target</button>
+            <button class="secondary" onclick="toggleOverride()" id="overrideBtn" style="margin-top: 20px;">Heater Power: CHECKING...</button>
+        </div>
+
+         <div class="card">
+            <h2>Sensor Calibration</h2>
+            <label class="label">Temperature Correction Offset (°C)</label>
+            <input type="number" id="tempCorrInput" step="0.1" value="0.0">
+            <button onclick="updateCorrection()">Update Correction</button>
+        </div>
+
+        <div class="card">
+            <h2>PID Tuning</h2>
+            <label class="label">Proportional (Kp)</label>
+            <input type="number" id="kpInput" step="0.1">
+            <label class="label">Integral (Ki)</label>
+            <input type="number" id="kiInput" step="0.01">
+            <label class="label">Derivative (Kd)</label>
+            <input type="number" id="kdInput" step="0.1">
+            <button onclick="updatePID()">Save PID Settings</button>
+        </div>
+
+        <div class="card">
+            <h2>MQTT / Home Assistant</h2>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                <label class="label" style="margin:0;">Enable Integration</label>
+                <label class="switch">
+                <input type="checkbox" id="mqttToggle" onchange="toggleMqttFields()">
+                <span class="slider round"></span>
+                </label>
+            </div>
+            
+            <div id="mqttFields" style="display:none;">
+                <label class="label">Broker Address</label>
+                <input type="text" id="mqttServer" placeholder="192.168.1.x">
+                
+                <label class="label">Port</label>
+                <input type="number" id="mqttPort" placeholder="1883">
+                
+                <label class="label">Username</label>
+                <input type="text" id="mqttUser">
+                
+                <label class="label">Password</label>
+                <input type="password" id="mqttPass">
+            </div>
+            <button onclick="updateConfig()">Save MQTT Configuration</button>
+        </div>
+        
+        <a href="/update" class="ota-link">Firmware Update (OTA)</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', fetchInitialConfig);
+
         async function fetchInitialConfig() {
             try {
                const response = await fetch('/api/status');
                const data = await response.json();
-               firstLoad = true; 
                
-               // PID
+               // Controls
                document.getElementById('setpointInput').value = data.target;
+
+               // Correction
+               if(data.temp_correction !== undefined) {
+                   document.getElementById('tempCorrInput').value = data.temp_correction;
+               }
+               
+               // Override Button State
+               const overrideBtn = document.getElementById('overrideBtn');
+               if (data.heater_enabled) {
+                   overrideBtn.textContent = "Turn Heater OFF";
+                   overrideBtn.style.background = "#e74c3c";
+               } else {
+                   overrideBtn.textContent = "Turn Heater ON";
+                   overrideBtn.style.background = "#2ecc71";
+               }
+
+               // PID
                document.getElementById('kpInput').value = data.kp;
                document.getElementById('kiInput').value = data.ki;
                document.getElementById('kdInput').value = data.kd;
@@ -266,8 +312,6 @@ const char index_html[] PROGMEM = R"rawliteral(
                    document.getElementById('mqttPass').value = data.mqtt_pass || '';
                    toggleMqttFields();
                }
-
-               firstLoad = false;
             } catch(e){ console.error(e); }
         }
 
@@ -277,11 +321,6 @@ const char index_html[] PROGMEM = R"rawliteral(
         }
 
         async function updateConfig() {
-            // PID
-            const kp = document.getElementById('kpInput').value;
-            const ki = document.getElementById('kiInput').value;
-            const kd = document.getElementById('kdInput').value;
-            
             // MQTT
             const mqttEnabled = document.getElementById('mqttToggle').checked;
             const mqttServer = document.getElementById('mqttServer').value;
@@ -294,9 +333,6 @@ const char index_html[] PROGMEM = R"rawliteral(
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        pid_kp: parseFloat(kp), 
-                        pid_ki: parseFloat(ki), 
-                        pid_kd: parseFloat(kd),
                         mqtt_enabled: mqttEnabled,
                         mqtt_server: mqttServer,
                         mqtt_port: parseInt(mqttPort),
@@ -309,7 +345,22 @@ const char index_html[] PROGMEM = R"rawliteral(
         }
         
         async function updatePID() {
-             updateConfig(); 
+            const kp = document.getElementById('kpInput').value;
+            const ki = document.getElementById('kiInput').value;
+            const kd = document.getElementById('kdInput').value;
+            
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        pid_kp: parseFloat(kp), 
+                        pid_ki: parseFloat(ki), 
+                        pid_kd: parseFloat(kd)
+                    })
+                });
+                alert('PID Settings Saved!');
+            } catch (e) { alert('Failed to update PID'); }
         }
 
         async function updateSetpoint() {
@@ -320,12 +371,26 @@ const char index_html[] PROGMEM = R"rawliteral(
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({setpoint: parseFloat(val)})
                 });
+                alert('Target Updated!');
             } catch (e) { alert('Failed to update setpoint'); }
+        }
+
+        async function updateCorrection() {
+            const val = document.getElementById('tempCorrInput').value;
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({temp_correction: parseFloat(val)})
+                });
+                alert('Correction Updated! Refreshing...');
+                setTimeout(() => location.reload(), 1000);
+            } catch (e) { alert('Failed to update correction'); }
         }
 
         async function toggleOverride() {
              const btnText = document.getElementById('overrideBtn').textContent;
-             const turningOn = btnText.includes("ON"); // If it says "Turn Heater ON", we are turning it on
+             const turningOn = btnText.includes("ON");
              
              try {
                 await fetch('/api/override', { 
@@ -343,10 +408,6 @@ const char index_html[] PROGMEM = R"rawliteral(
                 }
             } catch (e) { alert('Failed to toggle heater'); }
         }
-
-        // Start
-        fetchInitialConfig();
-        initWebSocket();
     </script>
 </body>
 </html>

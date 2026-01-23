@@ -26,6 +26,7 @@ class Temperature {
 public:
   Temperature();
   void begin();
+  void setCorrection(float offset);
   void update();
   float getTemperature();
   uint8_t getFault();
@@ -40,6 +41,7 @@ private:
 
   SPIClass *_spi;
   float _currentTemp;
+  float _correctionOffset = 0.0;
   float _smoothedTemp;
   uint8_t _lastFault;
 

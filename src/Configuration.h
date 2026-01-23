@@ -15,8 +15,8 @@ struct ConfigData {
   float pid_kd;
   float pid_setpoint;
   bool mqtt_enabled;
-  bool
-      heater_enabled; // Persistence for Heater ON/OFF state // Conditional MQTT
+  bool heater_enabled; // Persistence for Heater ON/OFF state
+  float temp_correction;
 };
 
 class Configuration {
@@ -33,6 +33,7 @@ public:
   // Accessor
   ConfigData &data() { return _data; }
   float getTargetTemp() const { return _data.pid_setpoint; }
+  float getTempCorrection() const { return _data.temp_correction; }
 
 private:
   Preferences _prefs;

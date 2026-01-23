@@ -140,11 +140,13 @@ void Temperature::update() {
   }
 }
 
+void Temperature::setCorrection(float offset) { _correctionOffset = offset; }
+
 float Temperature::getTemperature() {
 #ifdef SIMULATION_MODE
-  return _simTemp;
+  return _simTemp + _correctionOffset;
 #else
-  return _smoothedTemp;
+  return _smoothedTemp + _correctionOffset;
 #endif
 }
 

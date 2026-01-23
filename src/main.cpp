@@ -23,6 +23,7 @@ void setup() {
   config.begin();
   networkManager.begin();
   temperature.begin();
+  temperature.setCorrection(config.getTempCorrection());
   // 4. Initialize PID
   if (config.data().heater_enabled) {
     pid.begin(); // Auto mode
@@ -63,8 +64,14 @@ void loop() {
 
     uint8_t fault = temperature.getFault();
 
-    // Serial Debug (keep it verbose for now) // Slower serial if needed or
-    // commented out Serial.print("Temp: "); ...
+    // Serial Debug
+    Serial.print("Target: ");
+    Serial.print(targetTemp);
+    Serial.print(" C, Temp: ");
+    Serial.print(currentTemp);
+    Serial.print(" C, Output: ");
+    Serial.print(output);
+    Serial.println("%");
 
     // Broadcast WebSocket
     webServer.broadcastStatus();

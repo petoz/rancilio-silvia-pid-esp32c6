@@ -62,6 +62,10 @@ void WebServerManager::setupRoutes() {
     request->send_P(200, "text/html", index_html);
   });
 
+  _server.on("/settings", AWS_HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settings_html);
+  });
+
   // 2. API Status Endpoint
   _server.on("/api/status", AWS_HTTP_GET,
              [this](AsyncWebServerRequest *request) {
@@ -75,7 +79,10 @@ void WebServerManager::setupRoutes() {
 
                doc["kp"] = _config.data().pid_kp;
                doc["ki"] = _config.data().pid_ki;
+               doc["kp"] = _config.data().pid_kp;
+               doc["ki"] = _config.data().pid_ki;
                doc["kd"] = _config.data().pid_kd;
+               doc["temp_correction"] = _config.data().temp_correction;
 
                // MQTT Params for UI
                doc["mqtt_enabled"] = _config.data().mqtt_enabled;
@@ -135,6 +142,10 @@ void WebServerManager::setupRoutes() {
             _config.data().pid_ki = doc["pid_ki"];
           if (doc["pid_kd"].is<float>())
             _config.data().pid_kd = doc["pid_kd"];
+          if (doc["temp_correction"].is<float>()) {
+            _config.data().temp_correction = doc["temp_correction"];
+            _temp.setCorrection(_config.data().temp_correction);
+          }
 
           // MQTT Config
           if (doc["mqtt_enabled"].is<bool>())

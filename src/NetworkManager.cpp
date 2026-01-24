@@ -1,7 +1,23 @@
 #include "NetworkManager.h"
+#include "PID_Controller.h"
+#include "Temperature.h"
+#include <ArduinoJson.h>
+
+#include <ArduinoJson.h>
+
+// Topics
+const char *TOPIC_STATUS = "silvia/status";
+const char *TOPIC_SET_TEMP = "silvia/setpoint/set";
+const char *TOPIC_SET_SWITCH = "silvia/switch/set";
+const char *TOPIC_SET_KP = "silvia/pid/kp/set";
+const char *TOPIC_SET_KI = "silvia/pid/ki/set";
+const char *TOPIC_SET_KD = "silvia/pid/kd/set";
+const char *TOPIC_AVAILABILITY = "silvia/status/availability";
 
 SilviaNetworkManager::SilviaNetworkManager(Configuration &config)
-    : _config(config), _mqttClient(_espClient) {}
+    : _config(config), _mqttClient(_espClient) {
+  _mqttClient.setBufferSize(1024); // Increase buffer for discovery payloads
+}
 
 void SilviaNetworkManager::begin() {
   // 1. Create Params
@@ -37,46 +53,26 @@ void SilviaNetworkManager::begin() {
   _wm.addParameter(_p_pid_kd);
 
   // 3. Configure WM
-  // Lambda to callback class member
   _wm.setSaveParamsCallback([this]() { this->saveParamsCallback(); });
-
-  // Dark mode nice-to-have
   _wm.setClass("invert");
 
   // 4. AutoConnect
-  // Access Point Name: Silvia-PID-Config
-  // No password for config AP for simplicity (or add one if desired)
   bool res = _wm.autoConnect("Silvia-PID-Config");
 
   if (!res) {
     Serial.println("Failed to connect");
-    // ESP.restart(); // Loop will try again or we can continue offline
   } else {
     Serial.println("WiFi Connected");
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
   }
+
+  // Setup MQTT Callback
+  _mqttClient.setCallback(
+      [this](char *topic, uint8_t *payload, unsigned int length) {
+        this->onMqttCallback(topic, payload, length);
+      });
 }
-
-void SilviaNetworkManager::saveParamsCallback() {
-  Serial.println("Saving custom parameters...");
-
-  ConfigData &data = _config.data();
-
-  strlcpy(data.mqtt_server, _p_mqtt_server->getValue(),
-          sizeof(data.mqtt_server));
-  data.mqtt_port = atoi(_p_mqtt_port->getValue());
-  strlcpy(data.mqtt_user, _p_mqtt_user->getValue(), sizeof(data.mqtt_user));
-  strlcpy(data.mqtt_pass, _p_mqtt_pass->getValue(), sizeof(data.mqtt_pass));
-
-  data.pid_kp = atof(_p_pid_kp->getValue());
-  data.pid_ki = atof(_p_pid_ki->getValue());
-  data.pid_kd = atof(_p_pid_kd->getValue());
-
-  _config.save();
-}
-
-void SilviaNetworkManager::resetSettings() { _wm.resetSettings(); }
 
 void SilviaNetworkManager::loop() {
   if (!_config.data().mqtt_enabled) {
@@ -94,11 +90,45 @@ void SilviaNetworkManager::loop() {
     }
   } else {
     _mqttClient.loop();
+    publishState();
   }
 }
 
+void SilviaNetworkManager::publishState() {
+  unsigned long now = millis();
+  if (now - _lastStatePublish < 2000) // 2s interval
+    return;
+
+  _lastStatePublish = now;
+
+  if (!_temp || !_pid)
+    return;
+
+  JsonDocument doc;
+  doc["temp"] = _temp->getTemperature();
+  doc["target"] = _config.getTargetTemp();
+  doc["output"] = _pid->getOutput();
+  if (_pid->isManualMode()) {
+    if (_config.data().heater_enabled) {
+      doc["state"] = "MANUAL"; // Shouldn't strictly happen with logic below
+    } else {
+      doc["state"] = "OFF";
+    }
+  } else {
+    doc["state"] = (_pid->getOutput() > 0) ? "heating" : "idle";
+  }
+
+  doc["heater_on"] = _config.data().heater_enabled;
+  doc["kp"] = _config.data().pid_kp;
+  doc["ki"] = _config.data().pid_ki;
+  doc["kd"] = _config.data().pid_kd;
+
+  String output;
+  serializeJson(doc, output);
+  _mqttClient.publish(TOPIC_STATUS, output.c_str());
+}
+
 void SilviaNetworkManager::reconnect() {
-  // Basic reconnect logic
   ConfigData &data = _config.data();
   if (strlen(data.mqtt_server) == 0)
     return;
@@ -106,19 +136,24 @@ void SilviaNetworkManager::reconnect() {
   _mqttClient.setServer(data.mqtt_server, data.mqtt_port);
 
   Serial.print("Attempting MQTT connection...");
-  // Create a random client ID
   String clientId = "SilviaESP32-";
   clientId += String(random(0xffff), HEX);
 
-  if (_mqttClient.connect(clientId.c_str(), _config.data().mqtt_user,
-                          _config.data().mqtt_pass)) {
+  // Connect with Last Will and Testament (LWT)
+  if (_mqttClient.connect(clientId.c_str(), data.mqtt_user, data.mqtt_pass,
+                          TOPIC_AVAILABILITY, 0, true, "offline")) {
     Serial.println("connected");
-    // Once connected, publish an announcement...
-    _mqttClient.publish("silvia/status", "online");
-    // ... and resubscribe
-    _mqttClient.subscribe("silvia/setpoint/set");
 
-    // Auto-Discovery
+    // Publish availability
+    _mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
+
+    // Subscribe to topics
+    _mqttClient.subscribe(TOPIC_SET_TEMP);
+    _mqttClient.subscribe(TOPIC_SET_SWITCH);
+    _mqttClient.subscribe(TOPIC_SET_KP);
+    _mqttClient.subscribe(TOPIC_SET_KI);
+    _mqttClient.subscribe(TOPIC_SET_KD);
+
     sendDiscoveryConfig();
   } else {
     Serial.print("failed, rc=");
@@ -127,49 +162,119 @@ void SilviaNetworkManager::reconnect() {
   }
 }
 
+void SilviaNetworkManager::onMqttCallback(char *topic, byte *payload,
+                                          unsigned int length) {
+  String msg;
+  for (unsigned int i = 0; i < length; i++) {
+    msg += (char)payload[i];
+  }
+  Serial.printf("MQTT Rx [%s]: %s\n", topic, msg.c_str());
+
+  if (String(topic) == TOPIC_SET_TEMP) {
+    float val = msg.toFloat();
+    if (val >= 20.0 && val <= 140.0) {
+      _config.data().pid_setpoint = val;
+      _config.save();
+    }
+  } else if (String(topic) == TOPIC_SET_SWITCH) {
+    bool on = (msg == "ON" || msg == "true" || msg == "1");
+    _config.data().heater_enabled = on;
+    _config.save();
+    if (on) {
+      _pid->setManualMode(false);
+    } else {
+      _pid->setManualMode(true);
+      _pid->setManualPower(0);
+    }
+  } else if (String(topic) == TOPIC_SET_KP) {
+    _config.data().pid_kp = msg.toFloat();
+    _config.save();
+    _pid->setTunings(_config.data().pid_kp, _config.data().pid_ki,
+                     _config.data().pid_kd);
+  } else if (String(topic) == TOPIC_SET_KI) {
+    _config.data().pid_ki = msg.toFloat();
+    _config.save();
+    _pid->setTunings(_config.data().pid_kp, _config.data().pid_ki,
+                     _config.data().pid_kd);
+  } else if (String(topic) == TOPIC_SET_KD) {
+    _config.data().pid_kd = msg.toFloat();
+    _config.save();
+    _pid->setTunings(_config.data().pid_kp, _config.data().pid_ki,
+                     _config.data().pid_kd);
+  }
+
+  // Force immediate update
+  publishState();
+}
+
 void SilviaNetworkManager::sendDiscoveryConfig() {
-  // Common Device info
   String device =
-      "\"device\":{\"identifiers\":[\"silvia_pid\"],\"name\":\"Rancilio Silvia "
+      "\"device\":{\"identifiers\":[\"silvia_pid\"],\"name\":\"Silvia "
       "PID\",\"manufacturer\":\"Rancilio\",\"model\":\"Silvia "
       "V3\",\"sw_version\":\"1.0.0\"}";
 
-  // 1. Current Temperature (Sensor)
-  String tempPayload =
-      "{\"name\": \"Silvia Temperature\", \"unique_id\": \"silvia_temp\", "
-      "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
-      "value_json.temp }}\", \"unit_of_measurement\": \"°C\", "
-      "\"device_class\": \"temperature\", " +
-      device + "}";
-  _mqttClient.publish("homeassistant/sensor/silvia/temperature/config",
-                      tempPayload.c_str(), true);
+  String availability = "\"availability_topic\": \"" +
+                        String(TOPIC_AVAILABILITY) +
+                        "\", "
+                        "\"payload_available\": \"online\", "
+                        "\"payload_not_available\": \"offline\", ";
 
-  // 2. Target Temperature (Sensor for now, eventually Number)
-  String targetPayload =
-      "{\"name\": \"Silvia Target\", \"unique_id\": \"silvia_target\", "
-      "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
-      "value_json.target }}\", \"unit_of_measurement\": \"°C\", "
-      "\"device_class\": \"temperature\", " +
-      device + "}";
-  _mqttClient.publish("homeassistant/sensor/silvia/target/config",
-                      targetPayload.c_str(), true);
+  // 1. Climate Entity (Target + Current)
+  // Using MQTT Climate integration
+  String climatePayload =
+      "{\"name\": \"Silvia Thermotstat\", \"unique_id\": \"silvia_climate\", "
+      "\"action_topic\": \"silvia/status\", \"action_template\": \"{{ "
+      "value_json.state }}\", "
+      "\"current_temperature_topic\": \"silvia/status\", "
+      "\"current_temperature_template\": \"{{ value_json.temp }}\", "
+      "\"temperature_command_topic\": \"silvia/setpoint/set\", "
+      "\"temperature_state_topic\": \"silvia/status\", "
+      "\"temperature_state_template\": \"{{ value_json.target }}\", "
+      "\"mode_command_topic\": \"silvia/switch/set\", "
+      "\"mode_state_topic\": \"silvia/status\", \"mode_state_template\": \"{% "
+      "if value_json.heater_on %}heat{% else %}off{% endif %}\", "
+      "\"modes\": [\"off\", \"heat\"], "
+      "\"min_temp\": 20, \"max_temp\": 110, \"precision\": 0.1, \"temp_step\": "
+      "0.1, " +
+      availability + device + "}";
+  _mqttClient.publish("homeassistant/climate/silvia/config",
+                      climatePayload.c_str(), true);
 
-  // 3. Output (Sensor)
-  String outputPayload =
+  // 2. Heater Output (Sensor)
+  String outPayload =
       "{\"name\": \"Silvia Heater Output\", \"unique_id\": \"silvia_output\", "
       "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
-      "value_json.output }}\", \"unit_of_measurement\": \"%\", \"icon\": "
-      "\"mdi:radiator\", " +
-      device + "}";
+      "value_json.output }}\", "
+      "\"unit_of_measurement\": \"%\", \"icon\": \"mdi:radiator\", " +
+      availability + device + "}";
   _mqttClient.publish("homeassistant/sensor/silvia/output/config",
-                      outputPayload.c_str(), true);
+                      outPayload.c_str(), true);
 
-  // 4. State (Sensor)
-  String statePayload =
-      "{\"name\": \"Silvia State\", \"unique_id\": \"silvia_state\", "
+  // 3. PID Kp (Number)
+  String kpPayload =
+      "{\"name\": \"Silvia PID Kp\", \"unique_id\": \"silvia_kp\", "
+      "\"command_topic\": \"silvia/pid/kp/set\", "
       "\"state_topic\": \"silvia/status\", \"value_template\": \"{{ "
-      "value_json.state }}\",  \"icon\": \"mdi:coffee-maker\", " +
-      device + "}";
-  _mqttClient.publish("homeassistant/sensor/silvia/state/config",
-                      statePayload.c_str(), true);
+      "value_json.kp }}\", "
+      "\"min\": 0, \"max\": 200, \"step\": 0.1, \"icon\": "
+      "\"mdi:chart-bell-curve\", " +
+      availability + device + "}";
+  _mqttClient.publish("homeassistant/number/silvia/kp/config",
+                      kpPayload.c_str(), true);
 }
+
+void SilviaNetworkManager::saveParamsCallback() {
+  Serial.println("Saving custom parameters...");
+  ConfigData &data = _config.data();
+  strlcpy(data.mqtt_server, _p_mqtt_server->getValue(),
+          sizeof(data.mqtt_server));
+  data.mqtt_port = atoi(_p_mqtt_port->getValue());
+  strlcpy(data.mqtt_user, _p_mqtt_user->getValue(), sizeof(data.mqtt_user));
+  strlcpy(data.mqtt_pass, _p_mqtt_pass->getValue(), sizeof(data.mqtt_pass));
+  data.pid_kp = atof(_p_pid_kp->getValue());
+  data.pid_ki = atof(_p_pid_ki->getValue());
+  data.pid_kd = atof(_p_pid_kd->getValue());
+  _config.save();
+}
+
+void SilviaNetworkManager::resetSettings() { _wm.resetSettings(); }

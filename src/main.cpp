@@ -21,6 +21,7 @@ void setup() {
   Serial.println("Rancilio Silvia PID Starting...");
 
   config.begin();
+  networkManager.setModules(temperature, pid);
   networkManager.begin();
   temperature.begin();
   temperature.setCorrection(config.getTempCorrection());
@@ -60,7 +61,7 @@ void loop() {
   networkManager.loop();
 
   static unsigned long lastPrint = 0;
-  if (millis() - lastPrint >= 5000) { // 2Hz Update Rate for Chart
+  if (millis() - lastPrint >= 500) { // 2Hz Update Rate for Chart
     lastPrint = millis();
 
     uint8_t fault = temperature.getFault();

@@ -7,5 +7,5 @@
     - [x] Clean up Dashboard
 - [x] Add Temperature Correction Feature
 - [x] Add Configurable Reference Resistor (Rref)
-- [ ] Documentation Updates
+- [x] Documentation Updates
 - [x] Build and Flash

@@ -18,8 +18,8 @@ void Configuration::setDefaults() {
   _data.pid_kp = PID_KP_DEFAULT;
   _data.pid_ki = PID_KI_DEFAULT;
   _data.pid_kd = PID_KD_DEFAULT;
-  _data.pid_setpoint = 95.0;  // Typical espresso temp
-  _data.mqtt_enabled = false; // Disabled by default
+  _data.pid_setpoint = 95.0; // Typical espresso temp
+  _data.mqtt_enabled = true; // Enabled by default
   _data.heater_enabled = true;
   _data.temp_correction = 0.0;
   _data.rref = 430.0;

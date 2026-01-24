@@ -6,12 +6,28 @@
 #include <PubSubClient.h>
 #include <WiFiManager.h>
 
+// Topics
+extern const char *TOPIC_STATUS;
+extern const char *TOPIC_SET_TEMP;
+extern const char *TOPIC_SET_SWITCH;
+extern const char *TOPIC_SET_KP;
+extern const char *TOPIC_SET_KI;
+extern const char *TOPIC_SET_KD;
+extern const char *TOPIC_AVAILABILITY;
+
+class Temperature;
+class PID_Controller;
+
 class SilviaNetworkManager {
 public:
   SilviaNetworkManager(Configuration &config);
   void begin();
   void loop();
   void sendDiscoveryConfig();
+  void setModules(Temperature &temp, PID_Controller &pid) {
+    _temp = &temp;
+    _pid = &pid;
+  }
   void resetSettings(); // Helper to clear wifi settings
 
 private:
@@ -36,6 +52,13 @@ private:
 
   void saveParamsCallback();
   void reconnect();
+  void onMqttCallback(char *topic, byte *payload, unsigned int length);
+  void publishState();
+
+  Temperature *_temp = nullptr;
+  PID_Controller *_pid = nullptr;
+
+  unsigned long _lastStatePublish = 0;
 };
 
 #endif

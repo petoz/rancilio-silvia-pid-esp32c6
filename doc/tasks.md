@@ -1,10 +1,11 @@
 # Project Tasks
 
-- [ ] Implement Serial Output (Temp, Power, Output, Target)
-- [ ] Refactor Web UI
-    - [ ] Create Settings Page
-    - [ ] Move PID, MQTT, Update to Settings
-    - [ ] Clean up Dashboard
-- [ ] Add Temperature Correction Feature
+- [x] Implement Serial Output (Temp, Power, Output, Target)
+- [x] Refactor Web UI
+    - [x] Create Settings Page
+    - [x] Move PID, MQTT, Update to Settings
+    - [x] Clean up Dashboard
+- [x] Add Temperature Correction Feature
+- [x] Add Configurable Reference Resistor (Rref)
 - [ ] Documentation Updates
-- [ ] Build and Flash
+- [x] Build and Flash

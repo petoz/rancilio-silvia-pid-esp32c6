@@ -2,7 +2,8 @@
 
 Temperature::Temperature()
     : _spi(nullptr), _currentTemp(0.0), _smoothedTemp(0.0), _lastFault(0),
-      _state(IDLE), _lastStateChangeTime(0), _lastReadAttempt(0) {}
+      _state(IDLE), _lastStateChangeTime(0), _lastReadAttempt(0), _rref(430.0) {
+}
 
 void Temperature::begin() {
   // PIN_SPI_mosi/miso/sck/cs defined in config.h
@@ -141,6 +142,7 @@ void Temperature::update() {
 }
 
 void Temperature::setCorrection(float offset) { _correctionOffset = offset; }
+void Temperature::setRref(float rref) { _rref = rref; }
 
 float Temperature::getTemperature() {
 #ifdef SIMULATION_MODE
@@ -205,7 +207,7 @@ float Temperature::calculateTemperature(uint16_t RTDraw) {
   // Simplified from Adafruit library
   float Rt = RTDraw;
   Rt /= 32768;
-  Rt *= RREF;
+  Rt *= _rref;
 
   // Coefficients for PT100
   float a = 3.9083e-3;

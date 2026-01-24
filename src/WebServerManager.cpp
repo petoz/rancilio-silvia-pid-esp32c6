@@ -79,10 +79,9 @@ void WebServerManager::setupRoutes() {
 
                doc["kp"] = _config.data().pid_kp;
                doc["ki"] = _config.data().pid_ki;
-               doc["kp"] = _config.data().pid_kp;
-               doc["ki"] = _config.data().pid_ki;
                doc["kd"] = _config.data().pid_kd;
                doc["temp_correction"] = _config.data().temp_correction;
+               doc["rref"] = _config.data().rref;
 
                // MQTT Params for UI
                doc["mqtt_enabled"] = _config.data().mqtt_enabled;
@@ -145,6 +144,10 @@ void WebServerManager::setupRoutes() {
           if (doc["temp_correction"].is<float>()) {
             _config.data().temp_correction = doc["temp_correction"];
             _temp.setCorrection(_config.data().temp_correction);
+          }
+          if (doc["rref"].is<float>()) {
+            _config.data().rref = doc["rref"];
+            _temp.setRref(_config.data().rref);
           }
 
           // MQTT Config

@@ -226,10 +226,12 @@ const char settings_html[] PROGMEM = R"rawliteral(
         </div>
 
          <div class="card">
-            <h2>Sensor Calibration</h2>
+            <h2>Sensor Settings</h2>
             <label class="label">Temperature Correction Offset (°C)</label>
             <input type="number" id="tempCorrInput" step="0.1" value="0.0">
-            <button onclick="updateCorrection()">Update Correction</button>
+            <label class="label">Reference Resistor (Ohms)</label>
+            <input type="number" id="rrefInput" step="0.1" placeholder="Loading...">
+            <button onclick="updateSensorSettings()">Update Sensor Settings</button>
         </div>
 
         <div class="card">
@@ -277,9 +279,14 @@ const char settings_html[] PROGMEM = R"rawliteral(
 
         async function fetchInitialConfig() {
             try {
-               const response = await fetch('/api/status');
+               const response = await fetch('/api/status?_=' + new Date().getTime());
                const data = await response.json();
                
+               // Rref (Priority Update)
+               if(data.rref !== undefined) {
+                   document.getElementById('rrefInput').value = data.rref;
+               }
+
                // Controls
                document.getElementById('setpointInput').value = data.target;
 
@@ -375,17 +382,21 @@ const char settings_html[] PROGMEM = R"rawliteral(
             } catch (e) { alert('Failed to update setpoint'); }
         }
 
-        async function updateCorrection() {
-            const val = document.getElementById('tempCorrInput').value;
+        async function updateSensorSettings() {
+            const corr = document.getElementById('tempCorrInput').value;
+            const rref = document.getElementById('rrefInput').value;
             try {
                 await fetch('/api/config', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({temp_correction: parseFloat(val)})
+                    body: JSON.stringify({
+                        temp_correction: parseFloat(corr),
+                        rref: parseFloat(rref)
+                    })
                 });
-                alert('Correction Updated! Refreshing...');
+                alert('Sensor settings updated! Refreshing...');
                 setTimeout(() => location.reload(), 1000);
-            } catch (e) { alert('Failed to update correction'); }
+            } catch (e) { alert('Failed to update sensor settings'); }
         }
 
         async function toggleOverride() {

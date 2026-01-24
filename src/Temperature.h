@@ -19,7 +19,8 @@
 #define MAX31865_CONFIG_FAULTSTAT 0x02
 
 // Reference resistor and nominal resistance
-#define RREF 430.0
+// Reference resistor and nominal resistance
+// #define RREF 430.0  <- Moved to member variable
 #define RNOMINAL 100.0
 
 class Temperature {
@@ -27,6 +28,7 @@ public:
   Temperature();
   void begin();
   void setCorrection(float offset);
+  void setRref(float rref);
   void update();
   float getTemperature();
   uint8_t getFault();
@@ -42,6 +44,7 @@ private:
   SPIClass *_spi;
   float _currentTemp;
   float _correctionOffset = 0.0;
+  float _rref = 430.0; // Default
   float _smoothedTemp;
   uint8_t _lastFault;
 

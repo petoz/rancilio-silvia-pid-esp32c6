@@ -17,6 +17,7 @@ struct ConfigData {
   bool mqtt_enabled;
   bool heater_enabled; // Persistence for Heater ON/OFF state
   float temp_correction;
+  float rref;
 };
 
 class Configuration {

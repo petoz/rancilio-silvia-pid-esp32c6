@@ -26,14 +26,18 @@ public:
   // Espresso Logic Configuration
   void setEspressoLogic(bool enable);
 
+  // Diagnostics
+  int getZone() const { return _lastZone; }
+  double getCurrentLimit() const { return _lastLimit; }
+
 private:
   double _input;
   double _output;
   double _setpoint;
 
   // Defaults
-  // ECM Style Tunings (Milder P, Stronger I for stability, Good D)
-  double _Kp = 40.0;
+  // ECM Style Tunings (Very Mild to prevent overshoot)
+  double _Kp = 10.0;
   double _Ki = 2.0;
   double _Kd = 80.0;
 
@@ -43,20 +47,23 @@ private:
   // Espresso Logic
   bool _espressoLogicEnabled = true;
 
-  // Zones
+  // Zones - REVERTED to stricter values
   double _warmupDelta = 20.0;  // > 20C: Zone 1 (Max Power)
   double _rampMidDelta = 5.0;  // 20C-5C: Zone 2A (Ramp 1)
   double _approachDelta = 1.0; // 5C-1C: Zone 2B (Ramp 2). <1C: Zone 3 (Stable)
 
   // Power Levels
   double _maxPower = 100.0;
-  double _midPower = 45.0;
-  double _minPower = 30.0;
+  double _midPower = 20.0; // Drastically reduced from 45.0
+  double _minPower = 0.0;  // Allowed to drop to 0.0
 
   // Rate Limiter
   double _maxSlewRate =
       10.0;                 // Max % change per call (assuming ~1s sample time)
   double _lastOutput = 0.0; // For rate limiting
+
+  int _lastZone = 0;
+  double _lastLimit = 100.0;
 
   PID _myPID;
 };

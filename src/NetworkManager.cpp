@@ -2,6 +2,8 @@
 #include "PID_Controller.h"
 #include "Temperature.h"
 #include <ArduinoJson.h>
+#include <WiFiManager.h>
+#include <stdio.h>
 
 #include <ArduinoJson.h>
 
@@ -108,6 +110,8 @@ void SilviaNetworkManager::publishState() {
   doc["temp"] = _temp->getTemperature();
   doc["target"] = _config.getTargetTemp();
   doc["output"] = _pid->getOutput();
+  doc["zone"] = _pid->getZone();
+  doc["limit"] = _pid->getCurrentLimit();
   if (_pid->isManualMode()) {
     if (_config.data().heater_enabled) {
       doc["state"] = "MANUAL"; // Shouldn't strictly happen with logic below

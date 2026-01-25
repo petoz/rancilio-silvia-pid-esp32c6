@@ -1,4 +1,5 @@
 #include "WebServerManager.h"
+#include <ESPAsyncWebServer.h>
 
 #include "index_html.h"
 
@@ -200,4 +201,13 @@ void WebServerManager::setupRoutes() {
              });
 
   ElegantOTA.begin(&_server);
+  ElegantOTA.onEnd([](bool success) {
+    if (success) {
+      Serial.println("OTA Success. Rebooting...");
+      delay(500);
+      ESP.restart();
+    } else {
+      Serial.println("OTA Failed.");
+    }
+  });
 }

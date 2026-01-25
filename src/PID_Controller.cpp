@@ -1,4 +1,5 @@
 #include "PID_Controller.h"
+#include <PID_v1.h>
 
 PID_Controller::PID_Controller()
     : _input(0), _output(0), _setpoint(0),
@@ -47,12 +48,16 @@ float PID_Controller::compute(float input, float setpoint) {
 
   if (error > _warmupDelta) {
     // Zone 1: Warmup (> 20C)
+    _lastZone = 1;
+    _lastLimit = 100.0;
+
     // Max power, no integral
     if (_myPID.GetMode() != MANUAL)
       _myPID.SetMode(MANUAL);
     outputTarget = _maxPower;
   } else if (error > _approachDelta) {
     // Zone 2: Approach (20C - 1C)
+    _lastZone = 2;
 
     // Calculate Ramp Limit
     double maxLimit = 100.0;
@@ -75,6 +80,7 @@ float PID_Controller::compute(float input, float setpoint) {
         ratio = 1;
       maxLimit = _minPower + (ratio * (_midPower - _minPower));
     }
+    _lastLimit = maxLimit;
 
     // Transition Manual -> Auto cleanup
     if (_myPID.GetMode() != AUTOMATIC) {
@@ -101,6 +107,18 @@ float PID_Controller::compute(float input, float setpoint) {
   } else {
     // Zone 3: Stable (< 1C)
     // Full PID
+
+    // Check for Transition into Zone 3
+    if (_lastZone != 3) {
+      // Transition Clean-up
+      // Ensure we start fresh in Auto mode
+      if (_myPID.GetMode() != AUTOMATIC)
+        _myPID.SetMode(AUTOMATIC);
+    }
+
+    _lastZone = 3;
+    _lastLimit = 100.0;
+
     if (_myPID.GetMode() != AUTOMATIC)
       _myPID.SetMode(AUTOMATIC);
 

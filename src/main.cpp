@@ -33,7 +33,9 @@ void setup() {
   if (config.data().heater_enabled) {
     pid.begin(); // Auto mode
   } else {
-    pid.setTunings(40.0, 2.0, 80.0); // ECM Style Default Tunings
+    pid.setTunings(
+        30.0, 2.0,
+        80.0); // ECM Style Default Tunings (Lower P for less overshoot)
     pid.begin();
     pid.setManualMode(true);
     pid.setManualPower(0);

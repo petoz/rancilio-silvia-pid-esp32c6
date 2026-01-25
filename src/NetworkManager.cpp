@@ -109,6 +109,8 @@ void SilviaNetworkManager::publishState() {
     return;
 
   JsonDocument doc;
+  doc["temp"] = _temp->getTemperature();
+  doc["target"] = _config.getTargetTemp();
   doc["output"] = _pid->getOutput();
   doc["is_autotuning"] = _pid->isAutotuning();
 

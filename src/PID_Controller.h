@@ -2,7 +2,7 @@
 #define PID_CONTROLLER_H
 
 #include <Arduino.h>
-#include <QuickPID.h>
+#include <PID_v1.h>
 
 class PID_Controller {
 public:
@@ -24,19 +24,19 @@ public:
   float getOutput() const { return _output; }
 
 private:
-  float _input;
-  float _output;
-  float _setpoint;
+  double _input;
+  double _output;
+  double _setpoint;
 
   // Defaults
-  float _Kp = 2.0;
-  float _Ki = 0.5;
-  float _Kd = 2.0;
+  double _Kp = 2.0;
+  double _Ki = 0.5;
+  double _Kd = 2.0;
 
   bool _manualMode = false;
   float _manualPower = 0.0; // 0-100
 
-  QuickPID _myPID;
+  PID _myPID;
 };
 
 #endif

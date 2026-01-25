@@ -2,14 +2,14 @@
 
 PID_Controller::PID_Controller()
     : _input(0), _output(0), _setpoint(0),
-      _myPID(&_input, &_output, &_setpoint) {}
+      _myPID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, DIRECT) {}
 
 void PID_Controller::begin() {
   // Apply default tunings or load from config (TODO: Load from config)
   _myPID.SetTunings(_Kp, _Ki, _Kd);
-  _myPID.SetMode(QuickPID::Control::automatic);
+  _myPID.SetMode(AUTOMATIC);
   _myPID.SetOutputLimits(0, 100);
-  _myPID.SetSampleTimeUs(100000); // 100ms
+  _myPID.SetSampleTime(1000); // 1000ms
 }
 
 void PID_Controller::setTunings(float Kp, float Ki, float Kd) {
@@ -31,18 +31,17 @@ float PID_Controller::compute(float input, float setpoint) {
   _myPID.Compute();
 
   // _output is updated by Compute()
-  return _output;
+  return (float)_output;
 }
 
 void PID_Controller::setManualMode(bool manual) {
   _manualMode = manual;
-  // If we stay in automatic mode but just ignore output, integral builds up.
-  // Better to switch QuickPID mode?
+
   if (_manualMode) {
-    _myPID.SetMode(QuickPID::Control::manual);
+    _myPID.SetMode(MANUAL);
     _output = _manualPower; // Initialize output to manual power
   } else {
-    _myPID.SetMode(QuickPID::Control::automatic);
+    _myPID.SetMode(AUTOMATIC);
   }
 }
 

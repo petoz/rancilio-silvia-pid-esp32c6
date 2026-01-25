@@ -66,9 +66,18 @@ void loop() {
   // MQTT Cleanup
   networkManager.loop();
 
+  // Safety / Self-Healing
+  // If config says Heater ON, but PID is in Manual Mode, force it back to Auto.
+  // This prevents getting stuck in Manual 0% if a glitch occurs.
+  if (config.data().heater_enabled && pid.isManualMode()) {
+    Serial.println("Safety: Detected stuck Manual Mode. Forcing AUTO.");
+    pid.setManualMode(false);
+  }
+
+  unsigned long now = millis();
   static unsigned long lastPrint = 0;
-  if (millis() - lastPrint >= 500) { // 2Hz Update Rate for Chart
-    lastPrint = millis();
+  if (now - lastPrint >= 500) { // 2Hz Update Rate for Chart
+    lastPrint = now;
 
     uint8_t fault = temperature.getFault();
 

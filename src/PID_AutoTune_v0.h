@@ -7,7 +7,7 @@ class PID_ATune {
 public:
   // commonly used functions
   // **************************************************************************
-  PID_ATune(double *,
+  PID_ATune(double *, double *,
             double *); // * Constructor.  links the Autotune to a given PID
   int Runtime(); // * Similar to the PID Compue function, returns non 0 when
                  // done
@@ -35,8 +35,7 @@ public:
 private:
   void FinishUp();
   bool isMax, isMin;
-  double *input, *output;
-  double setpoint;
+  double *input, *output, *setpoint;
   double noiseBand;
   int controlType;
   bool running;

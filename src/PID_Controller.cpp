@@ -4,7 +4,7 @@
 PID_Controller::PID_Controller()
     : _input(0), _output(0), _setpoint(0),
       _myPID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, DIRECT) {
-  _autotune = new PID_ATune(&_input, &_output);
+  _autotune = new PID_ATune(&_input, &_output, &_setpoint);
 }
 
 void PID_Controller::startAutotune() {

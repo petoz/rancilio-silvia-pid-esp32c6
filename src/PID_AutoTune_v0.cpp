@@ -6,9 +6,10 @@
 
 #include "PID_AutoTune_v0.h"
 
-PID_ATune::PID_ATune(double *Input, double *Output) {
+PID_ATune::PID_ATune(double *Input, double *Output, double *Setpoint) {
   input = Input;
   output = Output;
+  setpoint = Setpoint;
   controlType = 0; // default to PI
   noiseBand = 0.5;
   running = false;
@@ -39,7 +40,7 @@ int PID_ATune::Runtime() {
     justchanged = false;
     absMax = refVal;
     absMin = refVal;
-    setpoint = refVal;
+    // setpoint is now a pointer, we don't override it with refVal
     running = true;
     outputStart = *output;
     *output = outputStart + oStep;
@@ -52,9 +53,9 @@ int PID_ATune::Runtime() {
 
   // oscillate the output base on the input's relation to the setpoint
 
-  if (refVal > setpoint + noiseBand)
+  if (refVal > *setpoint + noiseBand)
     *output = outputStart - oStep;
-  else if (refVal < setpoint - noiseBand)
+  else if (refVal < *setpoint - noiseBand)
     *output = outputStart + oStep;
 
   // bool isMax=true, isMin=true;

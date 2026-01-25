@@ -83,8 +83,8 @@ const char index_html[] PROGMEM = R"rawliteral(
                         label: 'Temperature (°C)',
                         data: Array(maxDataPoints).fill(null),
                         borderColor: '#e74c3c',
-                        backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                        tension: 0.4,
+                        borderWidth: 1,
+                        pointRadius: 0,
                         fill: true,
                         yAxisID: 'y'
                     },
@@ -92,8 +92,9 @@ const char index_html[] PROGMEM = R"rawliteral(
                         label: 'Target (°C)',
                         data: Array(maxDataPoints).fill(null),
                         borderColor: '#2ecc71',
-                        borderDash: [5, 5],
-                        fill: false,
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: true,
                         yAxisID: 'y'
                     },
                     {

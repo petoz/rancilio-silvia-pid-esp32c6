@@ -19,6 +19,8 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("Rancilio Silvia PID Starting...");
+  Serial.println(
+      "Espresso Logic: ENABLED (Warmup: >10C, Ramp: 10C->0.5C, Stable: <0.5C)");
 
   config.begin();
   networkManager.setModules(temperature, pid);

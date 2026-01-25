@@ -23,18 +23,28 @@ public:
 
   float getOutput() const { return _output; }
 
+  // Espresso Logic Configuration
+  void setEspressoLogic(bool enable);
+
 private:
   double _input;
   double _output;
   double _setpoint;
 
   // Defaults
-  double _Kp = 2.0;
+  // Aggressive tuning for Espresso Logic (High Kp/Kd because we clamp output)
+  double _Kp = 60.0;
   double _Ki = 0.5;
-  double _Kd = 2.0;
+  double _Kd = 120.0;
 
   bool _manualMode = false;
   float _manualPower = 0.0; // 0-100
+
+  // Espresso Logic
+  bool _espressoLogicEnabled = true;
+  double _warmupDelta = 10.0;  // Above this delta: Max Power, No Integral
+  double _approachDelta = 0.5; // Below this delta: Stable PID
+                               // Between 10.0 and 0.5: Ramp Limit
 
   PID _myPID;
 };

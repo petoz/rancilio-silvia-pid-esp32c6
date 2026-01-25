@@ -15,6 +15,8 @@ const char *TOPIC_SET_KP = "silvia/pid/kp/set";
 const char *TOPIC_SET_KI = "silvia/pid/ki/set";
 const char *TOPIC_SET_KD = "silvia/pid/kd/set";
 const char *TOPIC_AVAILABILITY = "silvia/status/availability";
+const char *TOPIC_START_AUTOTUNE = "silvia/pid/autotune/start";
+const char *TOPIC_STOP_AUTOTUNE = "silvia/pid/autotune/stop";
 
 SilviaNetworkManager::SilviaNetworkManager(Configuration &config)
     : _config(config), _mqttClient(_espClient) {
@@ -107,19 +109,24 @@ void SilviaNetworkManager::publishState() {
     return;
 
   JsonDocument doc;
-  doc["temp"] = _temp->getTemperature();
-  doc["target"] = _config.getTargetTemp();
   doc["output"] = _pid->getOutput();
-  doc["zone"] = _pid->getZone();
-  doc["limit"] = _pid->getCurrentLimit();
-  if (_pid->isManualMode()) {
-    if (_config.data().heater_enabled) {
-      doc["state"] = "MANUAL"; // Shouldn't strictly happen with logic below
-    } else {
-      doc["state"] = "OFF";
-    }
+  doc["is_autotuning"] = _pid->isAutotuning();
+
+  // Only show zone/limit if not tuning, or show special code
+  if (_pid->isAutotuning()) {
+    doc["state"] = "AUTOTUNE";
   } else {
-    doc["state"] = (_pid->getOutput() > 0) ? "heating" : "idle";
+    doc["zone"] = _pid->getZone();
+    doc["limit"] = _pid->getCurrentLimit();
+    if (_pid->isManualMode()) {
+      if (_config.data().heater_enabled) {
+        doc["state"] = "MANUAL";
+      } else {
+        doc["state"] = "OFF";
+      }
+    } else {
+      doc["state"] = (_pid->getOutput() > 0) ? "heating" : "idle";
+    }
   }
 
   doc["heater_on"] = _config.data().heater_enabled;
@@ -157,6 +164,11 @@ void SilviaNetworkManager::reconnect() {
     _mqttClient.subscribe(TOPIC_SET_KP);
     _mqttClient.subscribe(TOPIC_SET_KI);
     _mqttClient.subscribe(TOPIC_SET_KD);
+
+    _mqttClient.subscribe(TOPIC_SET_KD);
+    _mqttClient.subscribe(
+        TOPIC_START_AUTOTUNE); // Subscribe to Autotune trigger
+    _mqttClient.subscribe(TOPIC_STOP_AUTOTUNE);
 
     sendDiscoveryConfig();
   } else {
@@ -205,6 +217,12 @@ void SilviaNetworkManager::onMqttCallback(char *topic, byte *payload,
     _config.save();
     _pid->setTunings(_config.data().pid_kp, _config.data().pid_ki,
                      _config.data().pid_kd);
+  } else if (String(topic) == TOPIC_START_AUTOTUNE) {
+    Serial.println("MQTT: Starting Autotune");
+    _pid->startAutotune();
+  } else if (String(topic) == TOPIC_STOP_AUTOTUNE) {
+    Serial.println("MQTT: Stopping Autotune");
+    _pid->stopAutotune();
   }
 
   // Force immediate update

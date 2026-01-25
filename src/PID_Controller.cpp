@@ -3,7 +3,37 @@
 
 PID_Controller::PID_Controller()
     : _input(0), _output(0), _setpoint(0),
-      _myPID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, DIRECT) {}
+      _myPID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, DIRECT) {
+  _autotune = new PID_ATune(&_input, &_output);
+}
+
+void PID_Controller::startAutotune() {
+  _isAutotuning = true;
+  _autotune->SetNoiseBand(0.5);
+  _autotune->SetOutputStep(100); // Toggle between 0 and 100 for Relay
+  _autotune->SetLookbackSec(10); // 10s lookback
+  _manualMode = true;            // Take over control
+  _myPID.SetMode(MANUAL);
+}
+
+void PID_Controller::stopAutotune() {
+  _isAutotuning = false;
+  _autotune->Cancel();
+  _manualMode = false;
+  _myPID.SetMode(AUTOMATIC);
+
+  // Apply new tunings? Or let user do it manually?
+  // ESPressIoT style: usually just prints them or saves them.
+  // We will expose them via getter or log them.
+  Serial.print("Autotune Finished. Kp: ");
+  Serial.print(_autotune->GetKp());
+  Serial.print(" Ki: ");
+  Serial.print(_autotune->GetKi());
+  Serial.print(" Kd: ");
+  Serial.println(_autotune->GetKd());
+
+  setTunings(_autotune->GetKp(), _autotune->GetKi(), _autotune->GetKd());
+}
 void PID_Controller::setEspressoLogic(bool enable) {
   _espressoLogicEnabled = enable;
 }
@@ -24,127 +54,50 @@ void PID_Controller::setTunings(float Kp, float Ki, float Kd) {
 }
 
 float PID_Controller::compute(float input, float setpoint) {
+  _input = input;
+  _setpoint = setpoint;
+
+  if (_isAutotuning) {
+    int val = _autotune->Runtime(); // Returns 1 when done
+    if (val != 0) {
+      stopAutotune();
+    }
+    return (float)_output;
+  }
+
   if (_manualMode) {
     return _manualPower;
   }
 
-  _input = input;
-  _setpoint = setpoint;
-
   if (!_espressoLogicEnabled) {
     // Standard behavior
-    if (_myPID.GetMode() != AUTOMATIC)
-      _myPID.SetMode(AUTOMATIC);
-    _myPID.SetOutputLimits(0, 100);
     _myPID.SetTunings(_Kp, _Ki, _Kd);
     _myPID.Compute();
     return (float)_output;
   }
 
-  double outputTarget = 0.0;
+  // Adaptive PID Logic (ESPressIoT)
+  double error = abs(_setpoint - _input);
 
-  // ECM Logic
-  double error = _setpoint - _input;
-
-  if (error > _warmupDelta) {
-    // Zone 1: Warmup (> 20C)
+  if (error > _adaptiveThreshold) {
+    // Aggressive Zone
     _lastZone = 1;
-    _lastLimit = 100.0;
-
-    // Max power, no integral
-    if (_myPID.GetMode() != MANUAL)
-      _myPID.SetMode(MANUAL);
-    outputTarget = _maxPower;
-  } else if (error > _approachDelta) {
-    // Zone 2: Approach (20C - 1C)
-    _lastZone = 2;
-
-    // Calculate Ramp Limit
-    double maxLimit = 100.0;
-
-    if (error > _rampMidDelta) {
-      // Zone 2A: 20C -> 5C. Ramp 100% -> 45%
-      double ratio = (error - _rampMidDelta) / (_warmupDelta - _rampMidDelta);
-      if (ratio < 0)
-        ratio = 0;
-      if (ratio > 1)
-        ratio = 1;
-      maxLimit = _midPower + (ratio * (_maxPower - _midPower));
-    } else {
-      // Zone 2B: 5C -> 1C. Ramp 45% -> 30%
-      double ratio =
-          (error - _approachDelta) / (_rampMidDelta - _approachDelta);
-      if (ratio < 0)
-        ratio = 0;
-      if (ratio > 1)
-        ratio = 1;
-      maxLimit = _minPower + (ratio * (_midPower - _minPower));
-    }
-    _lastLimit = maxLimit;
-
-    // Transition Manual -> Auto cleanup
-    if (_myPID.GetMode() != AUTOMATIC) {
-      _output = 0;
-      _myPID.SetMode(AUTOMATIC);
-    }
-
-    // We are in approach, so we kill Integral to prevent windup
-    // But we use PID to calculate P-term mainly
-    _myPID.SetTunings(_Kp, 0.0, _Kd);
-    _myPID.SetOutputLimits(0, maxLimit);
-    _myPID.Compute();
-
-    // If PID output is too low in approach, force at least minPower
-    // This prevents temperature from "stalling" or falling back
-    if (_output < _minPower) {
-      outputTarget = _minPower;
-    } else {
-      outputTarget = _output;
-    }
-
-    // Note: _output is updated by Compute(), but we might override it into
-    // outputTarget
+    _myPID.SetTunings(_aggKp, _aggKi, _aggKd);
   } else {
-    // Zone 3: Stable (< 1C)
-    // Full PID
-
-    // Check for Transition into Zone 3
-    if (_lastZone != 3) {
-      // Transition Clean-up
-      // Ensure we start fresh in Auto mode
-      if (_myPID.GetMode() != AUTOMATIC)
-        _myPID.SetMode(AUTOMATIC);
-    }
-
-    _lastZone = 3;
-    _lastLimit = 100.0;
-
-    if (_myPID.GetMode() != AUTOMATIC)
-      _myPID.SetMode(AUTOMATIC);
-
-    _myPID.SetTunings(_Kp, _Ki, _Kd); // Restore I
-    _myPID.SetOutputLimits(0, 100);
-    _myPID.Compute();
-    outputTarget = _output;
+    // Normal Zone
+    _lastZone = 2;
+    _myPID.SetTunings(_Kp, _Ki, _Kd);
   }
 
-  // Rate Limiter / Slew Rate Logic
-  double delta = outputTarget - _lastOutput;
-  if (delta > _maxSlewRate) {
-    outputTarget = _lastOutput + _maxSlewRate;
-  } else if (delta < -_maxSlewRate) {
-    outputTarget = _lastOutput - _maxSlewRate;
-  }
+  // Ensure Auto
+  if (_myPID.GetMode() != AUTOMATIC)
+    _myPID.SetMode(AUTOMATIC);
 
-  // Final clamp
-  if (outputTarget < 0)
-    outputTarget = 0;
-  if (outputTarget > 100)
-    outputTarget = 100;
+  _myPID.SetOutputLimits(0, 100);
+  _myPID.Compute();
 
-  _lastOutput = outputTarget;
-  _output = outputTarget;
-
+  _lastLimit = 100.0;
+  _output = _output; // PID lib updates _output pointer
   return (float)_output;
 }
 

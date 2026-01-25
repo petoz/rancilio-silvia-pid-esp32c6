@@ -40,53 +40,92 @@ float PID_Controller::compute(float input, float setpoint) {
     return (float)_output;
   }
 
-  // Espresso Logic Implementation
+  double outputTarget = 0.0;
+
+  // ECM Logic
   double error = _setpoint - _input;
 
   if (error > _warmupDelta) {
-    // Zone 1: Warmup (Far from setpoint)
-    // Strategy: Max Power, Disable Integral (Anti-windup)
+    // Zone 1: Warmup (> 20C)
+    // Max power, no integral
     if (_myPID.GetMode() != MANUAL)
       _myPID.SetMode(MANUAL);
-    _output = 100.0;
+    outputTarget = _maxPower;
   } else if (error > _approachDelta) {
-    // Zone 2: Approach (Ramping down)
-    // Strategy: Linear Limit Ramp + PD Control (No Integral)
+    // Zone 2: Approach (20C - 1C)
 
-    // Calculate Ramp Limit (20% to 100%)
-    double rampRatio =
-        (error - _approachDelta) / (_warmupDelta - _approachDelta);
-    if (rampRatio < 0)
-      rampRatio = 0;
-    if (rampRatio > 1)
-      rampRatio = 1;
+    // Calculate Ramp Limit
+    double maxLimit = 100.0;
 
-    double maxPower = 20.0 + (rampRatio * 80.0);
+    if (error > _rampMidDelta) {
+      // Zone 2A: 20C -> 5C. Ramp 100% -> 45%
+      double ratio = (error - _rampMidDelta) / (_warmupDelta - _rampMidDelta);
+      if (ratio < 0)
+        ratio = 0;
+      if (ratio > 1)
+        ratio = 1;
+      maxLimit = _midPower + (ratio * (_maxPower - _midPower));
+    } else {
+      // Zone 2B: 5C -> 1C. Ramp 45% -> 30%
+      double ratio =
+          (error - _approachDelta) / (_rampMidDelta - _approachDelta);
+      if (ratio < 0)
+        ratio = 0;
+      if (ratio > 1)
+        ratio = 1;
+      maxLimit = _minPower + (ratio * (_midPower - _minPower));
+    }
 
-    // Ensure we are in AUTOMATIC for PID calculation
+    // Transition Manual -> Auto cleanup
     if (_myPID.GetMode() != AUTOMATIC) {
-      // Transition Manual -> Auto:
-      // Reset output to 0 internally so ITerm initializes to 0.
-      // This is CRITICAL for Anti-Windup when coming from 100% manual power.
       _output = 0;
       _myPID.SetMode(AUTOMATIC);
     }
 
-    // Disable Integral during approach to prevent overshoot
+    // We are in approach, so we kill Integral to prevent windup
+    // But we use PID to calculate P-term mainly
     _myPID.SetTunings(_Kp, 0.0, _Kd);
-    _myPID.SetOutputLimits(0, maxPower);
+    _myPID.SetOutputLimits(0, maxLimit);
     _myPID.Compute();
-  } else {
-    // Zone 3: Stable (Close to setpoint)
-    // Strategy: Full PID with Integral
 
+    // If PID output is too low in approach, force at least minPower
+    // This prevents temperature from "stalling" or falling back
+    if (_output < _minPower) {
+      outputTarget = _minPower;
+    } else {
+      outputTarget = _output;
+    }
+
+    // Note: _output is updated by Compute(), but we might override it into
+    // outputTarget
+  } else {
+    // Zone 3: Stable (< 1C)
+    // Full PID
     if (_myPID.GetMode() != AUTOMATIC)
       _myPID.SetMode(AUTOMATIC);
 
-    _myPID.SetTunings(_Kp, _Ki, _Kd); // Restore I-term
+    _myPID.SetTunings(_Kp, _Ki, _Kd); // Restore I
     _myPID.SetOutputLimits(0, 100);
     _myPID.Compute();
+    outputTarget = _output;
   }
+
+  // Rate Limiter / Slew Rate Logic
+  double delta = outputTarget - _lastOutput;
+  if (delta > _maxSlewRate) {
+    outputTarget = _lastOutput + _maxSlewRate;
+  } else if (delta < -_maxSlewRate) {
+    outputTarget = _lastOutput - _maxSlewRate;
+  }
+
+  // Final clamp
+  if (outputTarget < 0)
+    outputTarget = 0;
+  if (outputTarget > 100)
+    outputTarget = 100;
+
+  _lastOutput = outputTarget;
+  _output = outputTarget;
 
   return (float)_output;
 }

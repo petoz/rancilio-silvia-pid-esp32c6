@@ -19,8 +19,9 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("Rancilio Silvia PID Starting...");
+  Serial.println("ECM-Style Logic: ENABLED");
   Serial.println(
-      "Espresso Logic: ENABLED (Warmup: >10C, Ramp: 10C->0.5C, Stable: <0.5C)");
+      "Zones: Warmup >20C | Approach 20-1C (Ramp 45-30%) | Stable <1C");
 
   config.begin();
   networkManager.setModules(temperature, pid);
@@ -32,6 +33,7 @@ void setup() {
   if (config.data().heater_enabled) {
     pid.begin(); // Auto mode
   } else {
+    pid.setTunings(40.0, 2.0, 80.0); // ECM Style Default Tunings
     pid.begin();
     pid.setManualMode(true);
     pid.setManualPower(0);
@@ -75,7 +77,9 @@ void loop() {
     Serial.print(currentTemp);
     Serial.print(" C, Output: ");
     Serial.print(output);
-    Serial.println("%");
+    Serial.print("% (Diff: ");
+    Serial.print(targetTemp - currentTemp);
+    Serial.println(" C)");
 
     // Broadcast WebSocket
     webServer.broadcastStatus();

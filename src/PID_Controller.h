@@ -32,19 +32,31 @@ private:
   double _setpoint;
 
   // Defaults
-  // Aggressive tuning for Espresso Logic (High Kp/Kd because we clamp output)
-  double _Kp = 60.0;
-  double _Ki = 0.5;
-  double _Kd = 120.0;
+  // ECM Style Tunings (Milder P, Stronger I for stability, Good D)
+  double _Kp = 40.0;
+  double _Ki = 2.0;
+  double _Kd = 80.0;
 
   bool _manualMode = false;
   float _manualPower = 0.0; // 0-100
 
   // Espresso Logic
   bool _espressoLogicEnabled = true;
-  double _warmupDelta = 10.0;  // Above this delta: Max Power, No Integral
-  double _approachDelta = 0.5; // Below this delta: Stable PID
-                               // Between 10.0 and 0.5: Ramp Limit
+
+  // Zones
+  double _warmupDelta = 20.0;  // > 20C: Zone 1 (Max Power)
+  double _rampMidDelta = 5.0;  // 20C-5C: Zone 2A (Ramp 1)
+  double _approachDelta = 1.0; // 5C-1C: Zone 2B (Ramp 2). <1C: Zone 3 (Stable)
+
+  // Power Levels
+  double _maxPower = 100.0;
+  double _midPower = 45.0;
+  double _minPower = 30.0;
+
+  // Rate Limiter
+  double _maxSlewRate =
+      10.0;                 // Max % change per call (assuming ~1s sample time)
+  double _lastOutput = 0.0; // For rate limiting
 
   PID _myPID;
 };
